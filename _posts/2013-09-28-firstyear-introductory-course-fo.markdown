@@ -71,3 +71,7 @@ view, that if you put some effort into it and really use what the underlying
 ideas of bologna are (instead of just picking up, what you hear from the media
 about it), you can create a really kick-ass curriculum, that is both more fun
 *and* more informative at the same time.
+
+All used content is on
+[github](https://github.com/FachschaftMathPhys/Infovorkurs), if you are
+interested in what exactly we used in the course.
