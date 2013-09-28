@@ -4,3 +4,6 @@
 [submodule "sitemap_generator"]
 	path = _plugins/sitemap_generator
 	url = https://github.com/kinnetica/jekyll-plugins.git
+[submodule "jekyll-rss"]
+	path = _plugins/jekyll-rss
+	url = https://github.com/agelber/jekyll-rss.git
