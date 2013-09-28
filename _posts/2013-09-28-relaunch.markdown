@@ -10,7 +10,7 @@ git-based blog-engine and about 5 times I stopped after making
 considerable progress (mostly because it was too hard to integrate
 comments). This time the urge to restart my blog is finally
 overpowering my chronic nii-syndrome and I decided to use
-[jekyll][jekyll] as a blog-engine and add some git-hook-magic myself.
+[jekyll](http://jekyllrb.com/) as a blog-engine and add some git-hook-magic myself.
 
 The layout is still pretty shitty, it's the default of jekyll, but I
 wanted to put it online before seing my efforts die again on such
