@@ -10,8 +10,12 @@ perl-winner was 191. I decided to give notes for C-golf beginners**
 **Note:** Most of this blog post is incredibly boring. A better way than to
 read through it is to just skip through the git-repository and refer to the
 explanations here everytime you don't know why a change works or what it
-does. If you want to read the more interesting stuff, [from about
-here](#interesting) it starts to get non-obvious I think.
+does. To make this easier, I added ankers to every paragraph, named by the
+commit of the change it explains. So if you want to know, how a specific change
+works, you can add `#commitid` to the url of this post, with `commitid` being
+the full id of the commit that change. If you want to read the more interesting
+stuff, [from about here](#4272ca2a181e8f50c1645b793c7a1338f9ff1502) it starts
+to get non-obvious I think.
 
 At the [rgb2rv10](http://rgb2r.noname-ev.de/) we again had a
 [codegolf](https://en.wikipedia.org/wiki/Code_golf) event. C is generally not a
@@ -38,6 +42,7 @@ needs a longer commandline, which is put in the Makefile, so you should `make`
 it). You can run it through the testsuite used in the contest by running
 `GOLF_BIN="./golf prove -l"`.
 
+<a name="e3dc46c7c88f740c6b4eb671cd3b987061797529"></a>
 The first step is to implement an easily readable, working version. This is
 done in the
 [first commit](https://github.com/Merovius/cgolf/blob/e3dc46c7c88f740c6b4eb671cd3b987061797529/golf.c).
@@ -47,11 +52,13 @@ walk through it, executing every instruction as we go. The stack is statically
 allocated and of a fixed size, but that's no problem, because we only have a
 limited testsuite anyway.
 
+<a name="38e6ffceb633615f48d0a9d25a391abf5228c35c"></a>
 The [next step](https://github.com/Merovius/cgolf/blob/38e6ffceb633615f48d0a9d25a391abf5228c35c/golf.c)
 is obvious: We remove comments and move to one-letter variable names, thus
 reducing readability, but also size considerably. We will leave most of the
 whitespace for now, because else it is hard to follow the changes.
 
+<a name="004b45da976b3d1aab23e1b5ed3b9ff87b002895"></a>
 An important lesson for C-golfers is the following: *`for` is never longer then
 `while` and most of the times shorter*. An endless loop with `while` takes one
 character more then a `for`-loop. We will later see more instances when for will
@@ -63,14 +70,17 @@ write them as cases in `?:` - or use the short-circuiting `&&` if there is no
 variable declarations into one to save `int`-keywords. These three changes are
 what happend in [the next version](https://github.com/Merovius/cgolf/blob/004b45da976b3d1aab23e1b5ed3b9ff87b002895/golf.c).
 
+<a name="eb5227716869399d62f12dcfc07c7e42094782b7"></a>
 We continue in our path and notice, that we every `char`-literal takes three
 bytes, while the number it represents often only takes two in decimal.
 [Let's fix that](https://github.com/Merovius/cgolf/blob/eb5227716869399d62f12dcfc07c7e42094782b7/golf.c).
 
+<a name="eb5227716869399d62f12dcfc07c7e42094782b7"></a>
 We also have two temporary variables `a` and `b`, that we shouldn't need.
 [We can get rid of them](https://github.com/Merovius/cgolf/blob/eb5227716869399d62f12dcfc07c7e42094782b7/golf.c),
 by thinking up a single statement for arithmetic operations.
 
+<a name="f0af3799d6c5ee3c30a1f43dd5c89523f2619759"></a>
 [The next step](https://github.com/Merovius/cgolf/blob/f0af3799d6c5ee3c30a1f43dd5c89523f2619759/golf.c)
 uses a real detail of C: If you don't give a type for a global variable, a
 parameter or the return type of a function, `int` is assumed. If a function is
@@ -80,6 +90,7 @@ these facts means, we can drop all `include`s and put our variables in the
 global scope to remove all `int`-keywords. This is a very basic, but very
 usefull technique.
 
+<a name="17f305a0091651c03bb9e86e6ee9332f72138c04"></a>
 [We can save more](https://github.com/Merovius/cgolf/blob/17f305a0091651c03bb9e86e6ee9332f72138c04/golf.c)
 by using a parameter to `main`. This is also a very basic and often seen trick
 in C-golfing. You get up to 3 local variables for free this way. In our case
@@ -88,21 +99,25 @@ arguments, which is 1 for a normal call (the first argument is the name with
 which the programm was called). This means, we get the initialization to 1 for
 free.
 
+<a name="f3957253031431ec25f8d4f68c10ca1b4dcfd4ed"></a>
 [A trivial optimization](https://github.com/Merovius/cgolf/blob/f3957253031431ec25f8d4f68c10ca1b4dcfd4ed/golf.c)
 is using `gets` instead of `read`. `gets` always adds a terminating zero-byte,
 so we need to grow our buffer a little bit.
 
+<a name="https://github.com/Merovius/cgolf/blob/fed1a817b88072dc5d27d8ae4dc772da8518ee5d"></a>
 If we now look at our code, all the `case`-keywords might annoy us. If we see
 a lot of repititions in our code, the obvious tool to use in C are `define`s. So
 [lets define](https://github.com/Merovius/cgolf/blob/fed1a817b88072dc5d27d8ae4dc772da8518ee5d/golf.c)
 the structure of the cases and replace every case by a short 1-letter identifier.
 
+<a name="9de0b6f05fc52e5c08829bcf6d60a83c6756fba2"></a>
 The same goes for the arithmetic operations: Four times the same long code cries
 for a [define](https://github.com/Merovius/cgolf/blob/9de0b6f05fc52e5c08829bcf6d60a83c6756fba2/golf.c).
 A `define` is not always a good solution. You have to weigh the additional
 overhead of the keyword and the needed newline against the savings and number
 of repititions.
 
+<a name="ec654b1a11012a7820807cd29fe65a6427f300d4"></a>
 [Next](https://github.com/Merovius/cgolf/blob/ec654b1a11012a7820807cd29fe65a6427f300d4/golf.c)
 we eliminate the variable `i`. Skilled C-coders use pointer-arithmetic quite
 often (no matter how bad the reputation is). In this case it would be a bad
@@ -110,11 +125,13 @@ idea, if we were not explicitely allowed to assume that all programs are
 correct and stay in the bounds given (because bound-checks are a lot harder
 without indexing).
 
+<a name="6a10cb1480e1ca6cdc61bd628d8cb2f4d365a699"></a>
 Another example of savings by `for`-loops is
 [the next change](https://github.com/Merovius/cgolf/blob/6a10cb1480e1ca6cdc61bd628d8cb2f4d365a699/golf.c).
 Here we moved two statements into the `for`-loop, thus using the semicolons we
 need there anyway and saving two bytes.
 
+<a name="7d506e18324daf3d6d98e25682321c19c7bef781"></a>
 So the next big thing that catches our eyes are the `switch`, `case` and
 `break`-keywords. Everytime you see long identifiers or keywords you should
 think about, wether a different program-structure or a different libc-builtin
@@ -132,7 +149,7 @@ by `,` they are evaluated in succession (contrary to using boolean operators
 for example) and the value of the last one is becoming the value of the whole
 expression - so our `void`-expression evaluates to 1 in this case.
 
-<a id="interesting"></a>
+<a name="4272ca2a181e8f50c1645b793c7a1338f9ff1502"></a>
 `exit` is still pretty long (especially with the added parens and
 comma-expression), so we want to avoid it too. Here comes a notably quote of
 the organisator of the competition into action: “The return value isn't
@@ -143,12 +160,14 @@ Instead of exiting orderly we just create the conditions for a segfault by
 assigning zero to `p`, which is dereferenced shortly thereafter, thus creating
 a segfault when we want to exit. This is one of my favourite optimizations.
 
+<a name="bb1b73fdfd4be6a75ebc47046af7b9af06ff80fe"></a>
 There still is some repitition in our code. We still assign to `d` more often
 then not. But our big nested ternary operator doesn't return anything yet. So our
 [next step](https://github.com/Merovius/cgolf/blob/bb1b73fdfd4be6a75ebc47046af7b9af06ff80fe/golf.c)
 is to return the new value for `d` in all subexpressions (if need be by using a
 comma). This does not save a lot, but still a few bytes.
 
+<a name="9e3bb16915752e237b52c2e7107c6aa118f00c87"></a>
 Now the sources of bytes to save are getting scarcer. What still is a pain is
 the explicit stack of a fixed size. Here another deep mistery of C (or more
 specifically the way modern computers work)  comes into play:
@@ -168,6 +187,7 @@ subtract a sufficiently high number from it to reserve space for the
 stackframes of the function calls. 781 is the minimum amount needed in my
 setup, everything up to 99999 should save at least one byte.
 
+<a name="cf3b25d16a63367a6262aac6a01ef0e8db3b2802"></a>
 This still is unsatisfactory, so we will hack a little more and use the fact,
 that the testsuite only uses quite small programms and a quite small stack is
 needed. So we just
@@ -180,6 +200,7 @@ borderline cheating, but it saves 6 bytes, so who cares. From now on it's
 absolutely forbidden to compile with optimizations, because this will destroy
 this coincidence. Oh well.
 
+<a name="8632848f60ebec3691165f5c6aab2fa7280ecc7e"></a>
 So, if we are already doing unreliable horrific voodoo which will curl up the
 fingernails of every honest C developer, we can also
 [save two bytes](https://github.com/Merovius/cgolf/blob/8632848f60ebec3691165f5c6aab2fa7280ecc7e/golf.c)
@@ -187,6 +208,7 @@ by not setting `p` to zero, but instead just doubling it. You will then end up
 with *some* address, that is hard to predict, but in all cases I tried leads to
 crashing just as reliable. This means, we exit our program in just one byte. Neato!
 
+<a name="4ace9e5ed8d0cb2803bc2dc6ae8ac61ce860e2f2"></a>
 There is not a lot we can save left now. What might still annoy us and is a
 very good tip in general are all this numbers. Even if most characters have
 only 2 bytes as a decimal, they still only have one byte as a character (not a
@@ -208,10 +230,12 @@ pretty much the only choice. This means, we have to include a DEL-character in
 our source-code, but the compiler is quite happy about that (the wiki isn't,
 github isn't, the editor isn't, but who cares). This is my second most favourite hack.
 
+<a name="4024652da1ce91f8158db0f0393cb34b1811f318"></a><a name="1179338363fc46acb50fbf5770e5a829331b716c"></a>
 Now there is not much left to do. We
 [remove the last char-literal left](https://github.com/Merovius/cgolf/blob/4024652da1ce91f8158db0f0393cb34b1811f318/golf.c) and
 [remove all non-essential whitespace](https://github.com/Merovius/cgolf/blob/1179338363fc46acb50fbf5770e5a829331b716c/golf.c).
 
+<a name="8f5dea4fe2f8bef86f9aac3b29953317d7861624"></a>
 This leaves us with 253 bytes. To get below 250, we
 [use buildflags](https://github.com/Merovius/cgolf/blob/8f5dea4fe2f8bef86f9aac3b29953317d7861624/Makefile)
 instead of
