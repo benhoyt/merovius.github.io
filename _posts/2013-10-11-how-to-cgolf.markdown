@@ -36,7 +36,7 @@ it until we reach the 246 byte solution in `master`. You can test it by
 compiling it (`gcc -o golf golf.c` should suffice in most cases, the shortest
 needs a longer commandline, which is put in the Makefile, so you should `make`
 it). You can run it through the testsuite used in the contest by running
-`GOLF_BIN="./golf prove -l`.
+`GOLF_BIN="./golf prove -l"`.
 
 The first step is to implement an easily readable, working version. This is
 done in the
