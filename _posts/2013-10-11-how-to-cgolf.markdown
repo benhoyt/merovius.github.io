@@ -13,7 +13,7 @@ explanations here everytime you don't know why a change works or what it
 does. To make this easier, I added ankers to every paragraph, named by the
 commit of the change it explains. So if you want to know, how a specific change
 works, you can add `#commitid` to the url of this post, with `commitid` being
-the full id of the commit that change. If you want to read the more interesting
+the full id of that change. If you want to read the more interesting
 stuff, [from about here](#4272ca2a181e8f50c1645b793c7a1338f9ff1502) it starts
 to get non-obvious I think.
 
