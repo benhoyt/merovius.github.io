@@ -92,7 +92,7 @@ free.
 is using `gets` instead of `read`. `gets` always adds a terminating zero-byte,
 so we need to grow our buffer a little bit.
 
-If we know look at our code, all the `case`-keywords might annoy us. If we see
+If we now look at our code, all the `case`-keywords might annoy us. If we see
 a lot of repititions in our code, the obvious tool to use in C are `define`s. So
 [lets define](https://github.com/Merovius/cgolf/blob/fed1a817b88072dc5d27d8ae4dc772da8518ee5d/golf.c)
 the structure of the cases and replace every case by a short 1-letter identifier.
