@@ -3,7 +3,7 @@
 	url = https://gist.github.com/834610.git
 [submodule "sitemap_generator"]
 	path = _plugins/sitemap_generator
-	url = https://github.com/kinnetica/jekyll-plugins.git
+	url = https://github.com/Merovius/sitemap_generator
 [submodule "jekyll-rss"]
 	path = _plugins/jekyll-rss
 	url = https://github.com/agelber/jekyll-rss.git

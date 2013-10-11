@@ -5,3 +5,7 @@ markdown: redcarpet
 pygments: true
 
 encoding: UTF-8
+
+sitemap:
+    url: https://blog.merovius.de
+    exclude: [ 'atom.xml', 'impressum.html', 'google59e5fe5f31947a20.html', 'robots.txt' ]
