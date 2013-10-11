@@ -49,7 +49,7 @@ done in the
 Though you yourself might have come up with a different implementation, this is
 pretty straightforward I think. We just read the whole esocalc-sourcecode and
 walk through it, executing every instruction as we go. The stack is statically
-allocated and of a fixed size, but that's no problem, because we only have a
+allocated and of a fixed size, but that's no problem because we only have a
 limited testsuite anyway.
 
 <a name="38e6ffceb633615f48d0a9d25a391abf5228c35c"></a>
@@ -59,9 +59,9 @@ reducing readability, but also size considerably. We will leave most of the
 whitespace for now, because else it is hard to follow the changes.
 
 <a name="004b45da976b3d1aab23e1b5ed3b9ff87b002895"></a>
-An important lesson for C-golfers is the following: *`for` is never longer then
-`while` and most of the times shorter*. An endless loop with `while` takes one
-character more then a `for`-loop. We will later see more instances when for will
+An important lesson for C-golfers is the following: *for is never longer then
+while and most of the times shorter*. An endless loop with `while` takes one
+character more then a `for`-loop. We will later see more instances when `for` will
 be considerably shorter. Also, we see the `if`/`else`-constructs in the
 control-flow instructions. It is considerably shorter to use a ternary operator
 in most cases, because in C, most statements are also expressions, so we can
@@ -75,9 +75,9 @@ We continue in our path and notice, that we every `char`-literal takes three
 bytes, while the number it represents often only takes two in decimal.
 [Let's fix that](https://github.com/Merovius/cgolf/blob/eb5227716869399d62f12dcfc07c7e42094782b7/golf.c).
 
-<a name="eb5227716869399d62f12dcfc07c7e42094782b7"></a>
+<a name="75625a730875ded009a216887db5455b5105e7e6"></a>
 We also have two temporary variables `a` and `b`, that we shouldn't need.
-[We can get rid of them](https://github.com/Merovius/cgolf/blob/eb5227716869399d62f12dcfc07c7e42094782b7/golf.c),
+[We can get rid of them](https://github.com/Merovius/cgolf/blob/75625a730875ded009a216887db5455b5105e7e6/golf.c),
 by thinking up a single statement for arithmetic operations.
 
 <a name="f0af3799d6c5ee3c30a1f43dd5c89523f2619759"></a>
@@ -88,7 +88,11 @@ not defined, a prototype of `int foo()` is assumed, meaning we can pass
 arbitrary arguments and get an `int`. The libc is linked in by default. All
 these facts means, we can drop all `include`s and put our variables in the
 global scope to remove all `int`-keywords. This is a very basic, but very
-usefull technique.
+usefull technique. It has one important caveat, you should look out for: If you
+need the return value of a libc-function and it is *not* `int`, you should
+think about wether it can be safely converted. For example on amd64 an `int`
+has 32 bits, but a pointer has 64 bits, therefore pointers as return values get
+truncated (even if you assign them to a pointer).
 
 <a name="17f305a0091651c03bb9e86e6ee9332f72138c04"></a>
 [We can save more](https://github.com/Merovius/cgolf/blob/17f305a0091651c03bb9e86e6ee9332f72138c04/golf.c)
@@ -147,11 +151,11 @@ have to be expressions). We use `exit()` instead, which is an expression, but a
 around that for now by using `(exit(0),1)` instead. If you connect expressions
 by `,` they are evaluated in succession (contrary to using boolean operators
 for example) and the value of the last one is becoming the value of the whole
-expression - so our `void`-expression evaluates to 1 in this case.
+expression - so our `exit`-expression evaluates to 1 in this case.
 
 <a name="4272ca2a181e8f50c1645b793c7a1338f9ff1502"></a>
 `exit` is still pretty long (especially with the added parens and
-comma-expression), so we want to avoid it too. Here comes a notably quote of
+comma-expression), so we want to avoid it too. Here comes a notable quote of
 the organisator of the competition into action: “The return value isn't
 important, as long as the output is correct. So it doesn't matter if you
 segfault or anything”. This is the key to
@@ -167,12 +171,12 @@ then not. But our big nested ternary operator doesn't return anything yet. So ou
 is to return the new value for `d` in all subexpressions (if need be by using a
 comma). This does not save a lot, but still a few bytes.
 
-<a name="9e3bb16915752e237b52c2e7107c6aa118f00c87"></a>
+<a name="309465a985f67a8326ab10347b568ef467362b1c"></a>
 Now the sources of bytes to save are getting scarcer. What still is a pain is
 the explicit stack of a fixed size. Here another deep mistery of C (or more
 specifically the way modern computers work)  comes into play:
 [The call stack](https://en.wikipedia.org/wiki/Call_stack). We can actually
-[use this as our stack](https://github.com/Merovius/cgolf/blob/9e3bb16915752e237b52c2e7107c6aa118f00c87/golf.c).
+[use this as our stack](https://github.com/Merovius/cgolf/blob/309465a985f67a8326ab10347b568ef467362b1c/golf.c).
 The way this works is, that we use a pointer to an address in the memory area,
 the operating system reserved for our call stack and grow down (contrary to the
 illustration on wikipedia, the stack grows downwards. But this is a minor
@@ -184,14 +188,14 @@ do not overwrite anything important if growing down. There is however a
 problem: We call `gets` and `printf` which push a few stackframes to the
 callstack. Our stack would get smashed by these calls. Therefore we just
 subtract a sufficiently high number from it to reserve space for the
-stackframes of the function calls. 781 is the minimum amount needed in my
+stackframes of the function calls. 760 is the minimum amount needed in my
 setup, everything up to 99999 should save at least one byte.
 
-<a name="cf3b25d16a63367a6262aac6a01ef0e8db3b2802"></a>
+<a name="00afa97fb52ba275f638092118b49b4027261928"></a>
 This still is unsatisfactory, so we will hack a little more and use the fact,
 that the testsuite only uses quite small programms and a quite small stack is
 needed. So we just
-[use `s` unitialized](https://github.com/Merovius/cgolf/blob/cf3b25d16a63367a6262aac6a01ef0e8db3b2802/golf.c),
+[use `s` unitialized](https://github.com/Merovius/cgolf/blob/00afa97fb52ba275f638092118b49b4027261928/golf.c),
 which is absolutely crazy. I discovered (by accident), that you will always end
 up with a pointer to your program-array, using around 200 bytes of the end
 (most probably some earlier deeply nested call in the startup of the binary
@@ -200,22 +204,22 @@ borderline cheating, but it saves 6 bytes, so who cares. From now on it's
 absolutely forbidden to compile with optimizations, because this will destroy
 this coincidence. Oh well.
 
-<a name="8632848f60ebec3691165f5c6aab2fa7280ecc7e"></a>
+<a name="e2aafeb23a88abb731d0341610bc84acd285424d"></a>
 So, if we are already doing unreliable horrific voodoo which will curl up the
 fingernails of every honest C developer, we can also
-[save two bytes](https://github.com/Merovius/cgolf/blob/8632848f60ebec3691165f5c6aab2fa7280ecc7e/golf.c)
+[save two bytes](https://github.com/Merovius/cgolf/blob/e2aafeb23a88abb731d0341610bc84acd285424d/golf.c)
 by not setting `p` to zero, but instead just doubling it. You will then end up
 with *some* address, that is hard to predict, but in all cases I tried leads to
 crashing just as reliable. This means, we exit our program in just one byte. Neato!
 
-<a name="4ace9e5ed8d0cb2803bc2dc6ae8ac61ce860e2f2"></a>
+<a name="7b1803ce9fe52c0f57fb804067493bc975dfb3be"></a>
 There is not a lot we can save left now. What might still annoy us and is a
 very good tip in general are all this numbers. Even if most characters have
 only 2 bytes as a decimal, they still only have one byte as a character (not a
 `char`-literal!). We can
-[fix this](https://github.com/Merovius/cgolf/blob/4ace9e5ed8d0cb2803bc2dc6ae8ac61ce860e2f2/golf.c)
+[fix this](https://github.com/Merovius/cgolf/blob/7b1803ce9fe52c0f57fb804067493bc975dfb3be/golf.c)
 by passing a verbatim character as the first argument to the `c`-makro. To
-interpret it as a char, we stringify it (with `#a`) and dereference it (with
+interpret it as a `char`, we stringify it (with `#a`) and dereference it (with
 `*#a`), getting the first `char`. This opens a problem: A space is a
 significant character in the interpreted source code, so we need to use it as
 an argument. But a space is not significant at that point in the C source code,
@@ -230,16 +234,16 @@ pretty much the only choice. This means, we have to include a DEL-character in
 our source-code, but the compiler is quite happy about that (the wiki isn't,
 github isn't, the editor isn't, but who cares). This is my second most favourite hack.
 
-<a name="4024652da1ce91f8158db0f0393cb34b1811f318"></a><a name="1179338363fc46acb50fbf5770e5a829331b716c"></a>
+<a name="60a5912baccb94e3e31cc57fe09712b1e7cb0280"></a><a name="70da40d21ca8ff3a58e5d2a3a890ff0f44d2ee0c"></a>
 Now there is not much left to do. We
-[remove the last char-literal left](https://github.com/Merovius/cgolf/blob/4024652da1ce91f8158db0f0393cb34b1811f318/golf.c) and
-[remove all non-essential whitespace](https://github.com/Merovius/cgolf/blob/1179338363fc46acb50fbf5770e5a829331b716c/golf.c).
+[remove the last char-literal left](https://github.com/Merovius/cgolf/blob/60a5912baccb94e3e31cc57fe09712b1e7cb0280/golf.c) and
+[remove all non-essential whitespace](https://github.com/Merovius/cgolf/blob/70da40d21ca8ff3a58e5d2a3a890ff0f44d2ee0c/golf.c).
 
-<a name="8f5dea4fe2f8bef86f9aac3b29953317d7861624"></a>
+<a name="09ff6c236827639aad31edec198e97748241c3ea"></a>
 This leaves us with 253 bytes. To get below 250, we
-[use buildflags](https://github.com/Merovius/cgolf/blob/8f5dea4fe2f8bef86f9aac3b29953317d7861624/Makefile)
+[use buildflags](https://github.com/Merovius/cgolf/blob/09ff6c236827639aad31edec198e97748241c3ea/Makefile)
 instead of
-[defines](https://github.com/Merovius/cgolf/blob/8f5dea4fe2f8bef86f9aac3b29953317d7861624/golf.c).
+[defines](https://github.com/Merovius/cgolf/blob/09ff6c236827639aad31edec198e97748241c3ea/golf.c).
 Usually such flags are counted by the difference they add to a minimal compiler
 call needed. In this case, we have a 186 byte C-file (after removing the
 trailing newline added by vim) and 60 bytes of compiler-flags, totalling 246
