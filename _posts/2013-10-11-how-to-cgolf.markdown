@@ -134,7 +134,7 @@ need there anyway and saving two bytes.
 <a name="7d506e18324daf3d6d98e25682321c19c7bef781"></a>
 So the next big thing that catches our eyes are the `switch`, `case` and
 `break`-keywords. Everytime you see long identifiers or keywords you should
-think about, wether a different program-structure or a different libc-builtin
+think about wether a different program-structure or a different libc-builtin
 may help you save it. `switch`-construct can almost always be replaced by an
 `if`-`else if` construct (which is why we learned to use `switch` anyway). This
 is often shorter, but as we learned, the ternary operator is even shorter. So in
