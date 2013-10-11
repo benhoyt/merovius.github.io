@@ -74,7 +74,7 @@ by thinking up a single statement for arithmetic operations.
 [The next step](https://github.com/Merovius/cgolf/blob/f0af3799d6c5ee3c30a1f43dd5c89523f2619759/golf.c)
 uses a real detail of C: If you don't give a type for a global variable, a
 parameter or the return type of a function, `int` is assumed. If a function is
-not defined, a return type of `int (*)()` is assumed, meaning we can pass
+not defined, a prototype of `int foo()` is assumed, meaning we can pass
 arbitrary arguments and get an `int`. The libc is linked in by default. All
 these facts means, we can drop all `include`s and put our variables in the
 global scope to remove all `int`-keywords. This is a very basic, but very
