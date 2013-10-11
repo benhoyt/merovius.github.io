@@ -4,7 +4,7 @@ title: "Inject Environment variables into running processes"
 date: 2013-10-11 03:25:09
 ---
 
-**tl;dr: Use gdb to manipulate a running process is fun and just the right
+**tl;dr: Using gdb to manipulate a running process is fun and just the right
 amount of danger to be exiting**
 
 Just to document this (a friend asked me): If you ever wanted for example to
