@@ -79,7 +79,7 @@ you cannot unmount it (for example if it's mounted at the root-dir).
 
 So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does
-not grow it's hashtable, when it starts to fill up. Instead it returns -ENOSPC
+not grow its hashtable, when it starts to fill up. Instead it returns -ENOSPC
 or “no space left on device”.
 
 ext4 uses `half_md4` as a default hashing-mechanism. If I interpret my
@@ -112,3 +112,26 @@ mero@rincewind ~$ sudo tune2fs -O "^dir_index"
 
 Note however, that `dir_index` and `half_md4` where choices made for
 performance reasons. So you might experience a performance-hit after this.
+
+**UPDATE:** After trying it out, I realized, that the problem actually also
+persists with the tea-hash. I then had a look at [the
+ext4-documentation](https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout#Hash_Tree_Directories)
+about the topic and it seems, that the hash is only stored as 32 bits, so it
+actually does not matter what hash we choose, regarding this particular
+problem. So if `half_md4` is chosen [because of its better performance and
+collision-resistance](http://git.whamcloud.com/?p=tools/e2fsprogs.git;a=commitdiff_plain;h=d1070d91b4de8438dc78c034283baaa19b31d25e)
+it actually makes sense to leave it as the default. You can by the way easily
+test and reproduce the issue by using the following on an ext4 filesystem:
+
+```
+for a in `seq 100000`
+do
+        file=`head -c 51 /dev/urandom | base64 | tr '/' '_'`
+        touch $file
+done
+```
+
+Curiously, this only gives me about 160 collisions on 100K files (instead of
+about 10K collisions on 60K files), which would suggest, that my original
+sample (meaning my mailbox) exhibits some properties that make collisions more
+likely both on `half_md4` *and* `tea`.
