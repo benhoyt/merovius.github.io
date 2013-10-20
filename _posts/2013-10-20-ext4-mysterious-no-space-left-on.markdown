@@ -4,6 +4,9 @@ title: "ext4: Mysterious “No space left on device”-errors"
 date: 2013-10-20 21:13:07
 ---
 
+**tl;dr: ext4 has a feature called `dir_index` enabled by default, which is
+quite susceptible to hash-collisions**
+
 I am currently restructuring my mail-setup. Currently, I use offlineimap to
 sync my separate accounts to a series of maildirs on my server. I then use sup
 on the server as a MUA. I want to switch to a local setup with notmuch, so I
@@ -121,7 +124,7 @@ actually does not matter what hash we choose, regarding this particular
 problem. So if `half_md4` is chosen [because of its better performance and
 collision-resistance](http://git.whamcloud.com/?p=tools/e2fsprogs.git;a=commitdiff_plain;h=d1070d91b4de8438dc78c034283baaa19b31d25e)
 it actually makes sense to leave it as the default. You can by the way easily
-test and reproduce the issue by using the following on an ext4 filesystem:
+test and reproduce the issue by using the following on an ext4 file system:
 
 ```
 for a in `seq 100000`
