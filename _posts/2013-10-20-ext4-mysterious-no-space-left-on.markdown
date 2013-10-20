@@ -26,7 +26,7 @@ things (my issue was the last one):
 
 # Do you *actually* have enough space?
 
-Us `df -h`. There is actually a very common pitfall with ext4. Let's have a look:
+Use `df -h`. There is actually a very common pitfall with ext4. Let's have a look:
 
 ```
 mero@rincewind ~$ df -h
