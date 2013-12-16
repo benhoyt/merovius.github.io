@@ -4,6 +4,8 @@ title: "Incentives in education"
 date: 2013-12-16 01:32:47
 ---
 
+**tl;dr: I hate software-engineering as it is teached in Heidelberg. Really**
+
 I often recited the story of how I got to choose computer science over physics
 as a minor in my mathematics bachelor:
 
