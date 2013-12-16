@@ -19,7 +19,7 @@ poor incentive, when I was just discovering hacking and that I was really good
 at computer science. So I decided to pass on the opportunity, did not work all
 night on that last sheet (and later found out that I would have gotten credit
 for that course without even taking the written exam if I just handed in this
-the additional problem sheet) and instead decided to minor in computer science.
+additional problem sheet) and instead decided to minor in computer science.
 
 Three years after that I decided to get a second bachelor degree in computer
 science (I finished my bachelor of mathematics earlier that year and was
