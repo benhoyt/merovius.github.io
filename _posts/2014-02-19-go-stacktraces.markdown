@@ -47,7 +47,7 @@ func wrapErr(err error) error {
 	}
 
 	// This is a convenience, so that we can just throw a wrapErr at every
-	point we return an error and don't get layered useless wrappers
+	// point we return an error and don't get layered useless wrappers
 	if Err, ok := err.(*tracedError); ok {
 		return Err
 	}
