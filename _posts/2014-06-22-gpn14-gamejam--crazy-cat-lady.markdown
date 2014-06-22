@@ -27,8 +27,8 @@ cool result, if you ask me.
 On the technical side we used [LÖVE](https://love2d.org/), an open 2D game
 engine for lua, widely used in gamejams. I am pretty happy with this engine,
 it took about 3 hours to get most of the game-mechanics going, the rest was
-pretty much doing the detailed animations. It is definitely the nicest or most
-efficient code, but for a gamejam it is a well suited language and engine.
+pretty much doing the detailed animations. It is definitely not the nicest or
+most efficient code, but for a gamejam it is a well suited language and engine.
 
 If you want to try it (I don't think it is interesting for more than a few
 minutes, but definitely worth checking out), you should install LÖVE (most
