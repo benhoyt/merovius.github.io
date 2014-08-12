@@ -95,7 +95,7 @@ func NDSort(vals, perm []int) {
 
 But note, that this only works, because we want to sort an array of consecutive
 integers. In general, we don't want to do that. And I am unaware of a solution
-that doesn't has this problem (though I also didn't think about it a lot).
+that doesn't have this problem (though I also didn't think about it a lot).
 
 The solution of solving this problem in linear time lies in a simple
 observation: If we start at any index and iteratively jump to the *target*
