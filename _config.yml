@@ -2,7 +2,7 @@ name: Between a rock and a crazy place
 url: //blog.merovius.de/
 
 markdown: redcarpet
-pygments: true
+highlighter: pygments
 
 encoding: UTF-8
 
