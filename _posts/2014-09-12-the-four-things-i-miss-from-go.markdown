@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "The four things I miss from go"
+title: "The four things I miss about go"
 date: 2014-09-12 17:10:28
 ---
 As people who know me know, my current favourite language is
@@ -15,7 +15,7 @@ was done by Gustavo Niemeyer in a
 [blogpost](http://blog.labix.org/2012/06/26/less-is-more-and-is-not-always-straightforward)
 a few years back.
 
-So when I say, there are a few things popping up I miss from go, this does not
+So when I say, there are a few things popping up I miss about go, this does not
 mean I wish them to be included. I subjectively miss them and it would
 definitely make me happy, if they existed. But I still very much like the go
 devs for prioritizing simplicity over making me happy.
