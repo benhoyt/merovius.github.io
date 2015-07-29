@@ -28,6 +28,15 @@ The main gist is: Stuff that builds before is guaranteed to build after.
 Notable exceptions (apart from necessary breakages due to security or other
 bugs) are unkeyed struct literals and dot-imports.
 
+**[edit]**
+I should clarify, that whenever I talk about an API-change, I mean
+your exported API as defined by Code (as opposed to comments/documentation).
+This includes the public identifiers exported by your package, including type
+information. It excludes API-requirements specified in documentation, like on
+[io.Writer](http://golang.org/pkg/io/#Writer). These are just too complex to
+talk about in a meaningful way and must be dealt with separately anyway.
+**[/edit]**
+
 So, given this definition of breakage, we can start enumerating all the
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:
