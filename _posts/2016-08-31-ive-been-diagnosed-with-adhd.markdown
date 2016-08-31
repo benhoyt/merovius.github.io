@@ -11,7 +11,7 @@ As the title says, I've been recently diagnosed with ADHD and I thought I'd try
 to be as open about it as possible and share my personal experiences with
 mental illness. That being said, I am also adding the disclaimer, that I have
 no training or special knowledge about it and that the fact that I have been
-*diagnosed* with ADHD does not mean I am an authoritative source on it's
+*diagnosed* with ADHD does not mean I am an authoritative source on its
 effects, that this diagnoses is going to stick or that my experiences in any
 way generalize to other people who got the same diagnosis.
 
@@ -60,7 +60,7 @@ desk), not being able to get myself to start working on anything and hating
 myself for it.
 
 And while I am mostly talking about work, this affected my personal life too.
-Post remains unopened, important errands don't get done, I am having trouble
+Mail remains unopened, important errands don't get done, I am having trouble
 keeping in contact with friends, because I can always write or visit them some
 other time…
 
@@ -85,7 +85,7 @@ the potential cost (or the stress of dealing with how that works with my
 insurance), the perceived complexity of finding one that is both accepting
 patients that are only publicly insured and is specialized on my particular
 kinds of issues and the perceived lack of time prevented me from doing so.
-Apart from a general doubt about it's effectiveness and fear of the
+Apart from a general doubt about its effectiveness and fear of the
 implications for my self-perception and world-view, of course.
 
 Luckily one of the employee-benefits at my company is free and uncomplicated
@@ -129,7 +129,7 @@ latter, in particular, is *really* hard to get from books, for some reason :) ).
 I just finished my first day on
 [Methylphenidate](https://en.wikipedia.org/wiki/Methylphenidate) (the active
 substance in Ritalin), specifically Concerta. And though this is definitely
-*much* too early to actually make definitive judgments on it's effects and
+*much* too early to actually make definitive judgments on its effects and
 effectiveness, at least for this one day I was feeling really great and
 actively happy. Which, coincidentally, helped me to finally start on this post,
 to talk about mental health issues; a topic I've been wanting to talk about
@@ -144,7 +144,7 @@ can hear you thinking how all of this doesn't really speak "mental illness",
 how it seems implausible that someone with my CV would actually, objectively,
 get nothing done and how I am a drama queen and shouldn't try to solve my
 problems with dangerous medication). It's an intentionally broad overview of my
-process and it's main purpose is to "out" myself publicly and create starting
+process and its main purpose is to "out" myself publicly and create starting
 points for multiple, more specific, concise, interesting and convincing posts
 in the future. Things I might, or might not talk about are
 
@@ -158,7 +158,7 @@ in the future. Things I might, or might not talk about are
   out what was happening. And then I couldn't stop smiling. :)
 * Possibly things about my therapy? I really don't know what to expect about
   that, though. Therapy is kind off the long play, so it's much harder to
-  evaluate and talk about it's effectiveness.
+  evaluate and talk about its effectiveness.
 * Why I consider us currently to be in the Middle Ages of mental health and why
   I think that in a hundred years or so people will laugh at how we currently
   deal with it. And possibly be horrified.
