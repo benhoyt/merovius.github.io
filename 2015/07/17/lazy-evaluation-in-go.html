@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Lazy evaluation in go</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>Lazy evaluation in go</h2>
+<p class="meta">17 Jul 2015</p>
+
+<article class="post">
+<p><strong>tl;dr: I did <a href="https://godoc.org/merovius.de/go-misc/lazy">lazy evaluation in go</a></strong></p>
+
+<p>A small pattern that is usefull for some algorithms is <a href="https://en.wikipedia.org/wiki/Lazy_evaluation">lazy
+evaluation</a>. Haskell is famous
+for making extensive use of it. One way to emulate goroutine-safe lazy
+evaluation is using closures and <a href="https://godoc.org/sync">the sync-package</a>:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">LazyInt</span> <span class="kd">func</span><span class="p">()</span> <span class="kt">int</span>
+
+<span class="kd">func</span> <span class="nx">Make</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">()</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">LazyInt</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">v</span> <span class="kt">int</span>
+    <span class="kd">var</span> <span class="nx">once</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Once</span>
+    <span class="k">return</span> <span class="kd">func</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+        <span class="nx">once</span><span class="p">.</span><span class="nx">Do</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+            <span class="nx">v</span> <span class="p">=</span> <span class="nx">f</span><span class="p">()</span>
+            <span class="nx">f</span> <span class="p">=</span> <span class="kc">nil</span> <span class="c1">// so that f can now be GC&#39;ed</span>
+        <span class="p">})</span>
+        <span class="k">return</span> <span class="nx">v</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">n</span> <span class="o">:=</span> <span class="nx">Make</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="mi">23</span> <span class="p">})</span> <span class="c1">// Or something more expensive…</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">n</span><span class="p">())</span>                <span class="c1">// Calculates the 23</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">n</span><span class="p">()</span> <span class="o">+</span> <span class="mi">42</span><span class="p">)</span>           <span class="c1">// Reuses the calculated value</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This is not the fastest possible code, but it already has less overhead than
+one would think (and it is pretty simple to deduce a faster implementation from
+this). I have implemented a <a href="https://godoc.org/merovius.de/go-misc/cmd/go-lazy">simple command</a>,
+that generates these implementations (or rather, more optimized ones based on
+the same idea) for different
+<a href="https://godoc.org/merovius.de/go-misc/lazy">types</a>.</p>
+
+<p>This is of course just the simplest use-case for lazynes. In practice, you might also want Implementations of Expressions</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">LazyAdd</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">LazyInt</span><span class="p">)</span> <span class="nx">LazyInt</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">Make</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">a</span><span class="p">()</span> <span class="o">+</span> <span class="nx">b</span><span class="p">()</span> <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>or lazy slices (slightly more complicated to implement, but possible) but I
+left that for a later improvement of the package (plus, it makes the already
+quite big API even bigger) :)</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

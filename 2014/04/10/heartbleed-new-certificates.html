@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Heartbleed: New certificates</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>Heartbleed: New certificates</h2>
+<p class="meta">10 Apr 2014</p>
+
+<article class="post">
+<p>Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my
+server. Since CACert appears to be mostly dead (or dying at least), I am
+currently on the lookout for a new CA. In the meantime I switched to
+self-signed certificates for all my services.</p>
+
+<p>The new fingerprints are:
+<table>
+    <tr>
+        <th>Service</th>
+        <th>SHA1-Fingerprint</th>
+    </tr>
+    <tr>
+        <td>merovius.de</td>
+        <td>8C:85:B1:9E:37:92:FE:C9:71:F6:0E:C6:9B:25:9C:CD:30:2B:D5:35</td>
+    </tr>
+    <tr>
+        <td>blog.merovius.de</td>
+        <td>1B:DB:45:11:F3:EE:66:8D:3B:DF:63:B9:7C:D9:FC:26:A4:D1:E1:B8</td>
+    </tr>
+    <tr>
+        <td>git.merovius.de</td>
+        <td>65:51:16:25:1A:9E:50:B2:F7:D7:8A:2B:77:DE:DE:0C:02:3C:6C:ED</td>
+    </tr>
+    <tr>
+        <td>smtp (mail.merovius.de)</td>
+        <td>1F:E5:3F:9D:EE:B4:47:AE:2E:02:D8:2C:1E:2A:6C:FC:D6:62:99:F4</td>
+    </tr>
+    <tr>
+        <td>jabber (merovius.de)</th>
+        <td>15:64:29:49:82:0E:8B:76:47:1A:19:5B:98:6F:E4:56:24:D9:69:07</td>
+    </tr>
+</table></p>
+
+<p>This is of course useless in the general case, but if you already trust my
+gpg-key, you can use</p>
+<div class="highlight"><pre><code class="language-sh" data-lang="sh">curl http://blog.merovius.de/2014/04/10/heartbleed-new-certificates.html <span class="p">|</span> gpg
+</code></pre></div>
+<p>to get this post signed and verified.</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+  xmlns:trackback="http://madskills.com/public/xml/rss/module/trackback/">
+  <channel>
+    <title>Between a rock and a crazy place</title>
+    <link>//blog.merovius.de/</link>
+    <description>RSS feed for Between a rock and a crazy place</description>
+    <pubDate>Wed, 31 Aug 2016 02:22:38 +0000</pubDate>
+    <item>
+      <title>I've been diagnosed with ADHD</title>
+      <link>//blog.merovius.de//2016/08/31/ive-been-diagnosed-with-adhd.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I’ve been diagnosed with ADHD. I ramble incoherently for a while and I might do some less rambling posts about it in the future.&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Wed, 31 Aug 2016 02:22:38 +0000</pubDate>
+      <dc:date>2016-08-31T02:22:38+00:00</dc:date>
+    </item>
+    <item>
+      <title>Backwards compatibility in go</title>
+      <link>//blog.merovius.de//2015/07/29/backwards-compatibility-in-go.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: There are next to no “backwards compatible API changes” in go. You should explicitely name your compatibility-guarantees.&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Wed, 29 Jul 2015 01:10:11 +0000</pubDate>
+      <dc:date>2015-07-29T01:10:11+00:00</dc:date>
+    </item>
+    <item>
+      <title>Lazy evaluation in go</title>
+      <link>//blog.merovius.de//2015/07/17/lazy-evaluation-in-go.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I did &lt;a href=&quot;https://godoc.org/merovius.de/go-misc/lazy&quot;&gt;lazy evaluation in go&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Fri, 17 Jul 2015 19:31:10 +0000</pubDate>
+      <dc:date>2015-07-17T19:31:10+00:00</dc:date>
+    </item>
+    <item>
+      <title>Difficulties making SQL based authentication resilient against timing attacks</title>
+      <link>//blog.merovius.de//2015/04/13/difficulties-making-sql-based-au.html</link>
+      <description>
+&lt;p&gt;I’ve been thinking about how to do an authentication scheme, that uses some kind of relational database (it doesn’t matter specifically, that the database is relational, the concerns should pretty much apply to all databases) as a backing store, in a way that is resilient against timing side-channel attacks and doesn’t leak any data about which usernames exist in the system and which don’t.&lt;/p&gt;
+</description>
+      <pubDate>Mon, 13 Apr 2015 02:49:53 +0000</pubDate>
+      <dc:date>2015-04-13T02:49:53+00:00</dc:date>
+    </item>
+    <item>
+      <title>The four things I miss about go</title>
+      <link>//blog.merovius.de//2014/09/12/the-four-things-i-miss-from-go.html</link>
+      <description>
+&lt;p&gt;As people who know me know, my current favourite language is &lt;a href=&quot;http://golang.org/&quot;&gt;go&lt;/a&gt;. One of the best features of go is the lack of features. This is actually the reason I preferred C over most scripting languages for a long time – it does not overburden you with language-features that you first have to wrap your head around. You don’t have to think for a while about what classes or modules or whatever you want to have, you just write your code down and the (more or less) entire language can easily fit inside your head. One of the best writeups of this (contrasting it with python) was done by Gustavo Niemeyer in a &lt;a href=&quot;http://blog.labix.org/2012/06/26/less-is-more-and-is-not-always-straightforward&quot;&gt;blogpost&lt;/a&gt; a few years back.&lt;/p&gt;
+</description>
+      <pubDate>Fri, 12 Sep 2014 17:10:28 +0000</pubDate>
+      <dc:date>2014-09-12T17:10:28+00:00</dc:date>
+    </item>
+    <item>
+      <title>Applying permutation in constant space (and linear time)</title>
+      <link>//blog.merovius.de//2014/08/12/applying-permutation-in-constant.html</link>
+      <description>
+&lt;p&gt;permutation p, apply the permutation (in place) to the Array, using only O(1) extra space. So, if b is the array after the algorithm, we want that &lt;code&gt;a[i] == b[p[i]]&lt;/code&gt;.&lt;/p&gt;
+</description>
+      <pubDate>Tue, 12 Aug 2014 11:10:21 +0000</pubDate>
+      <dc:date>2014-08-12T11:10:21+00:00</dc:date>
+    </item>
+    <item>
+      <title>GPN14 GameJam - Crazy cat lady</title>
+      <link>//blog.merovius.de//2014/06/22/gpn14-gamejam--crazy-cat-lady.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl:dr: We made a &lt;a href=&quot;https://entropia.de/GPN14:GameJam:CrazyCatLady&quot;&gt;gamejam-game&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sun, 22 Jun 2014 13:45:28 +0000</pubDate>
+      <dc:date>2014-06-22T13:45:28+00:00</dc:date>
+    </item>
+    <item>
+      <title>Python-fnord of the day</title>
+      <link>//blog.merovius.de//2014/05/06/python-fnord-of-the-day.html</link>
+      <description>
+&lt;p&gt;This is an argument of believe, but I think this is highly irregular and unexpected behaviour of python:&lt;/p&gt;
+</description>
+      <pubDate>Tue, 06 May 2014 01:07:28 +0000</pubDate>
+      <dc:date>2014-05-06T01:07:28+00:00</dc:date>
+    </item>
+    <item>
+      <title>Heartbleed: New certificates</title>
+      <link>//blog.merovius.de//2014/04/10/heartbleed-new-certificates.html</link>
+      <description>
+&lt;p&gt;Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my server. Since CACert appears to be mostly dead (or dying at least), I am currently on the lookout for a new CA. In the meantime I switched to self-signed certificates for all my services.&lt;/p&gt;
+</description>
+      <pubDate>Thu, 10 Apr 2014 21:28:25 +0000</pubDate>
+      <dc:date>2014-04-10T21:28:25+00:00</dc:date>
+    </item>
+    <item>
+      <title>go stacktraces</title>
+      <link>//blog.merovius.de//2014/02/19/go-stacktraces.html</link>
+      <description>
+&lt;p&gt;Let’s say you write a library in &lt;a href=&quot;http://golang.org/&quot;&gt;go&lt;/a&gt; and want an easy way to get debugging information from your users. Sure, you return &lt;code&gt;error&lt;/code&gt;s from everything, but it is sometimes hard to pinpoint where a particular error occured and what caused it. If your package &lt;code&gt;panic&lt;/code&gt;s, that will give you a stacktrace, but as you probably know you shouldn’t &lt;code&gt;panic&lt;/code&gt; in case of an error, but just gracefull recover and return the error to your caller.&lt;/p&gt;
+</description>
+      <pubDate>Wed, 19 Feb 2014 02:17:59 +0000</pubDate>
+      <dc:date>2014-02-19T02:17:59+00:00</dc:date>
+    </item>
+    <item>
+      <title>Signed blog posts</title>
+      <link>//blog.merovius.de//2014/01/23/signed-blog-posts.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I sign my blogposts. curl http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Thu, 23 Jan 2014 04:04:25 +0000</pubDate>
+      <dc:date>2014-01-23T04:04:25+00:00</dc:date>
+    </item>
+    <item>
+      <title>Incentives in education</title>
+      <link>//blog.merovius.de//2013/12/16/incentives-in-education.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I hate software-engineering as it is teached in Heidelberg. Really&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Mon, 16 Dec 2013 01:32:47 +0000</pubDate>
+      <dc:date>2013-12-16T01:32:47+00:00</dc:date>
+    </item>
+    <item>
+      <title>ext4: Mysterious “No space left on device”-errors</title>
+      <link>//blog.merovius.de//2013/10/20/ext4-mysterious-no-space-left-on.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: ext4 has a feature called &lt;code&gt;dir_index&lt;/code&gt; enabled by default, which is quite susceptible to hash-collisions&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sun, 20 Oct 2013 21:13:07 +0000</pubDate>
+      <dc:date>2013-10-20T21:13:07+00:00</dc:date>
+    </item>
+    <item>
+      <title>Using i3 and vim to keep a set of notes at hand</title>
+      <link>//blog.merovius.de//2013/10/20/using-i3-and-vim-to-keep-a-set-o.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: Put a terminal with a vim-instance in an i3-scratchpad, combine it with autosave-when-idle and you got the perfect note keeping workflow&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sun, 20 Oct 2013 03:45:52 +0000</pubDate>
+      <dc:date>2013-10-20T03:45:52+00:00</dc:date>
+    </item>
+    <item>
+      <title>Tic Tac Toe AI</title>
+      <link>//blog.merovius.de//2013/10/19/tic-tac-toe-ai.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I wrote a simple Tic Tac Toe AI as an exercise. You can get it on &lt;a href=&quot;https://github.com/Merovius/tictactoe&quot;&gt;github&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sat, 19 Oct 2013 01:58:04 +0000</pubDate>
+      <dc:date>2013-10-19T01:58:04+00:00</dc:date>
+    </item>
+    <item>
+      <title>Inject Environment variables into running processes</title>
+      <link>//blog.merovius.de//2013/10/11/inject-environment-variables-int.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: Using gdb to manipulate a running process is fun and just the right amount of danger to be exiting&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Fri, 11 Oct 2013 03:25:09 +0000</pubDate>
+      <dc:date>2013-10-11T03:25:09+00:00</dc:date>
+    </item>
+    <item>
+      <title>How to C-Golf</title>
+      <link>//blog.merovius.de//2013/10/11/how-to-cgolf.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: We had a codegolf challenge recently. My C-solution was 246 byte, the perl-winner was 191. I decided to give notes for C-golf beginners&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Fri, 11 Oct 2013 02:09:38 +0000</pubDate>
+      <dc:date>2013-10-11T02:09:38+00:00</dc:date>
+    </item>
+    <item>
+      <title>New PGP Key</title>
+      <link>//blog.merovius.de//2013/10/03/new-pgp-key.html</link>
+      <description>
+&lt;p&gt;Because I recently applied for the position of a Debian maintainer, I finally had to upgrade my PGP Key to a more secure 4096 bit RSA. The new fingerprint is&lt;/p&gt;
+</description>
+      <pubDate>Thu, 03 Oct 2013 00:44:00 +0000</pubDate>
+      <dc:date>2013-10-03T00:44:00+00:00</dc:date>
+    </item>
+    <item>
+      <title>Lazy blogging with jekyll</title>
+      <link>//blog.merovius.de//2013/09/28/lazy-blogging-with-jekyll.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I put up a &lt;a href=&quot;https://gist.github.com/Merovius/6736709&quot;&gt;small script&lt;/a&gt; to automate creating blog-posts in jekyll&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sat, 28 Sep 2013 15:11:10 +0000</pubDate>
+      <dc:date>2013-09-28T15:11:10+00:00</dc:date>
+    </item>
+    <item>
+      <title>First-year introductory course for programming</title>
+      <link>//blog.merovius.de//2013/09/28/firstyear-introductory-course-fo.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;tl;dr: I gave a very introductory programming course and saw once again how the basic ideas underlying the modernization of teaching &lt;em&gt;just work&lt;/em&gt; when implemented right.&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sat, 28 Sep 2013 03:16:52 +0000</pubDate>
+      <dc:date>2013-09-28T03:16:52+00:00</dc:date>
+    </item>
+    <item>
+      <title>Relaunch</title>
+      <link>//blog.merovius.de//2013/09/28/relaunch.html</link>
+      <description>
+&lt;p&gt;Years ago I took down my blog because I was so unsatisfied with wordpress. In these years I started about 5 times to write my own git-based blog-engine and about 5 times I stopped after making considerable progress (mostly because it was too hard to integrate comments). This time the urge to restart my blog is finally overpowering my chronic nii-syndrome and I decided to use &lt;a href=&quot;http://jekyllrb.com/&quot;&gt;jekyll&lt;/a&gt; as a blog-engine and add some git-hook-magic myself.&lt;/p&gt;
+</description>
+      <pubDate>Sat, 28 Sep 2013 02:08:05 +0000</pubDate>
+      <dc:date>2013-09-28T02:08:05+00:00</dc:date>
+    </item>
+    <dc:date>2016-08-31T02:22:38+00:00</dc:date>
+  </channel>
+</rss>

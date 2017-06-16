@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Inject Environment variables into running processes</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>Inject Environment variables into running processes</h2>
+<p class="meta">11 Oct 2013</p>
+
+<article class="post">
+<p><strong>tl;dr: Using gdb to manipulate a running process is fun and just the right
+amount of danger to be exiting</strong></p>
+
+<p>Just to document this (a friend asked me): If you ever wanted for example to
+globally change your <code>$PATH</code>, or add a global <code>$LD_PRELOAD</code> (for example to use
+<a href="https://github.com/Merovius/insulterr">insulterr</a> ;) ), without restarting
+your session, gdb is your friend.</p>
+
+<p>You can call arbitrary functions in the context of any process (that you are
+priviledged to attach a debugger, it has to run under your uid or you have to
+be root, see <code>ptrace(2)</code> for specifics), as long as they are linked. Almost
+everything is linked to <code>libld</code>, so with enough effort this actually means
+<em>every</em> function.</p>
+
+<p>For example, suppose you are running <a href="http://i3wm.org">i3wm</a> and want to add
+<code>/home/user/insulterr/insulterr.so</code> to your <code>$LD_PRELOAD</code> in every process
+started by i3:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">$ gdb -p `pidof i3` `which i3`
+&lt;lots of output of gdb&gt;
+gdb $ call setenv(&quot;LD_PRELOAD&quot;, &quot;/home/user/insulterr/insulterr.so&quot;)
+gdb $ quit
+A debugging session is active.
+
+    Inferior 1 [process 2] will be detached.
+
+Quit anyway? (y or n) y
+Detaching from program: /usr/bin/i3, process 2
+</code></pre></div>
+<p>This is of course a terrible hack, by high standards. Things to look out for
+are (off the top of my head):</p>
+
+<ul>
+<li>You call a function that manipulates <code>errno</code> or does some other non-reentrent
+things. If you are attaching the debugger right in the middle of a library
+call (or immediately after) this <em>might</em> make the program unhappy because it
+does not detect an error (or falsely thinks there is an error).</li>
+<li>You call a function that does not work in a multithreaded context and another
+thread modifies it at the same time. Bad.</li>
+<li>You interrupt a badly checked <code>read(2)</code>/<code>write(2)</code>/<code>whatever(…)</code> call and a
+badly written program doesn&#39;t realize it got less data then expected (and/or
+crashes).  Shouldn&#39;t happen in practice, if it does, file a bug.</li>
+<li>You try to use symbols that are not available. This is actually not very bad
+and can be worked around (a friend of mine had the problem of needing <code>false</code>
+and just substituted 0).</li>
+<li>You use a daemon (like <code>urxvtd(1)</code>) for your terminals and the environment
+does not get passed correctly. This is also not very bad, just confusing.
+Attach your debugger to the daemon and change the environment there too.</li>
+<li>You attach the debugger to some process vital to the interaction with your
+debugger. Your window manager is a mild example. The terminal daemon is
+slightly worse (because, well, you can&#39;t actually type in the terminal window
+that your debugger is running in, ergo you can&#39;t stop it…), but you can
+change to a virtual terminal. Something like getty or init might be killing
+it.</li>
+</ul>
+
+<p>Have fun!</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

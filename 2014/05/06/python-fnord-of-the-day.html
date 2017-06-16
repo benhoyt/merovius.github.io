@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Python-fnord of the day</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>Python-fnord of the day</h2>
+<p class="meta">06 May 2014</p>
+
+<article class="post">
+<p>This is an argument of believe, but I think this is highly irregular and
+unexpected behaviour of python:</p>
+<div class="highlight"><pre><code class="language-python" data-lang="python"><span class="n">a</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">a</span>
+<span class="n">a</span> <span class="o">=</span> <span class="n">a</span> <span class="o">+</span> <span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+<span class="k">print</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+<span class="n">a</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">a</span>
+<span class="n">a</span> <span class="o">+=</span> <span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+<span class="k">print</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+</code></pre></div>
+<p>Output:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">[1, 2, 3, 4]
+[1, 2, 3, 4, 5]
+</code></pre></div>
+<p>Call me crazy, but in my world, <code>x += y</code> should behave exactly the same as <code>x =
+x + y</code> and this is another example, why operator overloading can be abused in
+absolutely horrible ways.</p>
+
+<p>Never mind, that there is actually python <a href="http://www.tutorialspoint.com/python/python_basic_operators.htm">teaching
+material</a> <a href="http://www.rafekettler.com/magicmethods.html#numeric">out
+there</a> that teaches wrong
+things. That is, there are actually people out there who think they know python
+well enough to teach it, but don&#39;t know this. Though credit where credit is
+due, the <a href="https://docs.python.org/2/reference/simple_stmts.html#augmented-assignment-statements">official documentation</a>
+mentions this behaviour.</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

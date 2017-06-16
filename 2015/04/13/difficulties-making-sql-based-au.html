@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Difficulties making SQL based authentication resilient against timing attacks</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>Difficulties making SQL based authentication resilient against timing attacks</h2>
+<p class="meta">13 Apr 2015</p>
+
+<article class="post">
+<p>I&#39;ve been thinking about how to do an authentication scheme, that uses some
+kind of relational database (it doesn&#39;t matter specifically, that the database
+is relational, the concerns should pretty much apply to all databases) as a
+backing store, in a way that is resilient against timing side-channel attacks
+and doesn&#39;t leak any data about which usernames exist in the system and which
+don&#39;t.</p>
+
+<p>The first obvious thing is, that you need to do a constant time comparison of
+password-hashes. Luckily, most modern crypto libraries should include something
+like that (at least go&#39;s bcrypt implementation comes with that).</p>
+
+<p>But now the question is, how you prevent enumerating users (or checking for
+existence). A naive query will return an empty result set if the user does not
+exists, so again, obviously, you need to compare against <em>some</em> password, even
+if the user isn&#39;t found. But just doing, for example</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="k">if</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Empty</span> <span class="p">{</span>
+    <span class="c1">// Compare against a prepared hash of an empty password, to have constant</span>
+    <span class="c1">// time check.</span>
+    <span class="nx">bcrypt</span><span class="p">.</span><span class="nx">CompareHashAndPassword</span><span class="p">(</span><span class="nx">HashOfEmptyPassword</span><span class="p">,</span> <span class="nx">enteredPassword</span><span class="p">)</span>
+<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="nx">bcrypt</span><span class="p">.</span><span class="nx">CompareHashAndPassword</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">PasswordHash</span><span class="p">,</span> <span class="nx">enteredPassword</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>won&#39;t get you very far. Because (for example) the CPU will predict either of
+the two branches (and the compiler might or might not decide to &quot;help&quot; with
+that), so again an attacker might be able to distinguish between the two cases.
+The best way, to achieve resilience against timing side-channels is to make
+sure, that your control flow does not depend on input data <em>at all</em>. Meaning no
+branch or loop should ever take in any way into account, what is actually input
+into your code (including the username and the result of the database query).</p>
+
+<p>So my next thought was to modify the query to return the hash of an empty
+password as a default, if no user is found. That way, your code is guaranteed
+to always get a well-defined bcrypt-hash from the database and your control
+flow does not depend on whether or not the user exists (and an empty password
+can be safely excluded in advance, as returning early for that does not give
+any new data to the attacker).</p>
+
+<p>Which sounds well, but now the question is, if maybe the timing <em>of your
+database query</em> tells the attacker something. And this is where I hit a
+roadblock: If the attacker knows enough about your code (i.e. what database
+engine you are using, what machine you are running on and what kind of indices
+your database uses) they can potentially enumerate users by timing your
+database queries. To illustrate: If you would use a simple linear list as an
+index, a failed search has to traverse the whole list, whereas a successfull
+search will abort early. The same issue exists with balanced trees. An attacker
+could potentially hammer your application with unlikely usernames and measure
+the mean time to answer. They can then test individual usernames and measure if
+the time to answer is significantly below the mean for failures, thus
+enumerating usernames.</p>
+
+<p>Now, I haven&#39;t tested this for practicality yet (might be fun) and it is pretty
+likely that this can&#39;t be exploited in reality. Also, the possibility of
+enumerating users isn&#39;t particularly desirable, but it is also far from a
+security meltdown of your authentication-system. Nevertheless, the idea that
+this theoretical problem exists makes me uneasy.</p>
+
+<p>An obvious fix would be to make sure, that every query always has to search
+the complete table on every lookup. I don&#39;t know if that is possible, it might
+be just trivial by not giving a limit and not marking the username column as
+unique, but it might also be hard and database-dependent because there will
+still be an index over this username column which might still create the same
+kind of issues. There will also likely still be a variance, because we
+basically just shifted the condition from our own code into the DBMS. I have
+simply no idea.</p>
+
+<p>So there you have it. I am happy to be corrected and pointed to some trivial
+design. I will likely accept the possibity of being vulnerable here, as the
+systems I am currently building aren&#39;t that critical. But I will probably still
+have a look at how other projects are handling this. And maybe if there really
+is a problem in practice.</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

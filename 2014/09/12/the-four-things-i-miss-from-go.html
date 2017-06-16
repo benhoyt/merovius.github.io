@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>The four things I miss about go</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>The four things I miss about go</h2>
+<p class="meta">12 Sep 2014</p>
+
+<article class="post">
+<p>As people who know me know, my current favourite language is
+<a href="http://golang.org/">go</a>. One of the best features of go is the lack of
+features. This is actually the reason I preferred C over most scripting
+languages for a long time – it does not overburden you with language-features
+that you first have to wrap your head around. You don&#39;t have to think for a
+while about what classes or modules or whatever you want to have, you just
+write your code down and the (more or less) entire language can easily fit
+inside your head. One of the best writeups of this (contrasting it with python)
+was done by Gustavo Niemeyer in a
+<a href="http://blog.labix.org/2012/06/26/less-is-more-and-is-not-always-straightforward">blogpost</a>
+a few years back.</p>
+
+<p>So when I say, there are a few things popping up I miss about go, this does not
+mean I wish them to be included. I subjectively miss them and it would
+definitely make me happy, if they existed. But I still very much like the go
+devs for prioritizing simplicity over making me happy.</p>
+
+<p>So let&#39;s dig in.</p>
+
+<ol>
+<li><a href="#generics">Generics</a></li>
+<li><a href="#weakrefs">Weak references</a></li>
+<li><a href="#dynload">Dynamic loading of go code</a></li>
+<li><a href="#gcgoroutines">Garbage-collected goroutines</a></li>
+</ol>
+
+<p><a name="generics"></a></p>
+
+<h1>Generics</h1>
+
+<p>So let&#39;s get this elephant out of the room first. I think this is the most
+named feature lacking from go. They are asked so often, they have their own
+entry in the <a href="http://golang.org/doc/faq#generics">go FAQ</a>. The usual answers
+are anything from &quot;maybe they will get in&quot; to &quot;I don&#39;t understand why people
+want generics, go has generic programming using interfaces&quot;. To illustrate one
+shortcoming of the (current) interface approach, consider writing a (simple)
+graph-algorithm:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Graph</span> <span class="p">[][]</span><span class="kt">int</span>
+
+<span class="kd">func</span> <span class="nx">DFS</span><span class="p">(</span><span class="nx">g</span> <span class="nx">Graph</span><span class="p">,</span> <span class="nx">start</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">visitor</span> <span class="kd">func</span><span class="p">(</span><span class="kt">int</span><span class="p">))</span> <span class="p">{</span>
+    <span class="nx">visited</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">bool</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">g</span><span class="p">))</span>
+
+    <span class="kd">var</span> <span class="nx">dfs</span> <span class="kd">func</span><span class="p">(</span><span class="kt">int</span><span class="p">)</span>
+    <span class="nx">dfs</span> <span class="p">=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">visited</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">{</span>
+            <span class="k">return</span>
+        <span class="p">}</span>
+        <span class="nx">visitor</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+        <span class="nx">visited</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="kc">true</span>
+        <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">j</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">g</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">{</span>
+            <span class="nx">dfs</span><span class="p">(</span><span class="nx">j</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="nx">dfs</span><span class="p">(</span><span class="nx">start</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This uses an adjacency list to represent the graph and does a recursive
+depth-first-search on it. Now imagine, you want to implement this algorithm
+generically (given, a DFS is not really hard enough to justify this, but you
+could just as easily have a more complex algorithm). This could be done like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Node</span> <span class="kd">interface</span><span class="p">{}</span>
+
+<span class="kd">type</span> <span class="nx">Graph</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">Neighbors</span><span class="p">(</span><span class="nx">Node</span><span class="p">)</span> <span class="p">[]</span><span class="nx">Node</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">DFS</span><span class="p">(</span><span class="nx">g</span> <span class="nx">Graph</span><span class="p">,</span> <span class="nx">start</span> <span class="nx">Node</span><span class="p">,</span> <span class="nx">visitor</span> <span class="kd">func</span><span class="p">(</span><span class="nx">Node</span><span class="p">))</span> <span class="p">{</span>
+    <span class="nx">visited</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="nx">Node</span><span class="p">]</span><span class="kt">bool</span><span class="p">)</span>
+
+    <span class="kd">var</span> <span class="nx">dfs</span> <span class="kd">func</span><span class="p">(</span><span class="nx">Node</span><span class="p">)</span>
+    <span class="nx">dfs</span> <span class="p">=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">n</span> <span class="nx">Node</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">visited</span><span class="p">[</span><span class="nx">n</span><span class="p">]</span> <span class="p">{</span>
+            <span class="k">return</span>
+        <span class="p">}</span>
+        <span class="nx">visitor</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span>
+        <span class="nx">visited</span><span class="p">[</span><span class="nx">n</span><span class="p">]</span> <span class="p">=</span> <span class="kc">true</span>
+        <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">n2</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">g</span><span class="p">.</span><span class="nx">Neighbors</span><span class="p">(</span><span class="nx">n</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nx">dfs</span><span class="p">(</span><span class="nx">n2</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="nx">dfs</span><span class="p">(</span><span class="nx">start</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This seems simple enough, but it has a lot of problems. For example, we loose
+type-safety: Even if we write <code>Neighbors(Node) []Node</code> there is no way to tell
+the compiler, that these instances of <code>Node</code> will actually always be the same.
+So an implementation of the graph interface would have to do type-assertions
+all over the place. Another problem is:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">AdjacencyList</span> <span class="p">[][]</span><span class="kt">int</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">AdjacencyList</span><span class="p">)</span> <span class="nx">Neighbors</span><span class="p">(</span><span class="nx">n</span> <span class="nx">Node</span><span class="p">)</span> <span class="p">[]</span><span class="nx">Node</span> <span class="p">{</span>
+    <span class="nx">i</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.(</span><span class="kt">int</span><span class="p">)</span>
+    <span class="kd">var</span> <span class="nx">result</span> <span class="p">[]</span><span class="nx">Node</span>
+    <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">j</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">l</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">{</span>
+        <span class="nx">result</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">result</span><span class="p">,</span> <span class="nx">j</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">result</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>An implementation of this interface as an adjacency-list actually performs
+pretty badly, because it can not return an <code>[]int</code>, but must return a <code>[]Node</code>,
+and even though <code>int</code> satisfies <code>Node</code>, <code>[]int</code> is not assignable to <code>[]Node</code>
+(for good reasons that lie in the implementation of interfaces, but still).</p>
+
+<p>The way to solve this, is to always map your nodes to integers. This is what
+the standard library does in the
+<a href="http://golang.org/pkg/sort/#Interface">sort-package</a>. It is exactly the same
+problem. But it might not always be possible, let alone straightforward, to do
+this for Graphs, for example if they do not fit into memory (e.g. a
+web-crawler). The answer is to have the caller maintain this mapping via a
+<code>map[Node]int</code> or something similar, but… meh.</p>
+
+<p><a name="weakrefs"></a></p>
+
+<h1>Weak references</h1>
+
+<p>I have to admit, that I am not sure, my use case here is really an important or
+even very nice one, but let&#39;s assume I want to have a database abstraction that
+transparently handles pointer-indirection. So let&#39;s say I have two tables T1
+and T2 and T2 has a foreign key referencing T1. I think it would be pretty
+neat, if a database abstraction could automatically deserialize this into a
+pointer to a T1-value <code>A</code>. But to do this. we would a) need to be able to
+recognize <code>A</code> a later Put (so if the user changes <code>A</code> and later stores it, the
+database knows what row in T1 to update) and b) hand out the <em>same</em> pointer, if
+another row in T2 references the same id.</p>
+
+<p>The only way I can think how to do this is to maintain a <code>map[Id]*T1</code> (or
+similar), but this would prevent the handed out values to ever be
+garbage-collected. Even though there a
+<a href="https://groups.google.com/forum/#!topic/golang-nuts/1ItNOOj8yW8/discussion">hacks</a>
+that would allow some use cases for weak references to be emulated, I don&#39;t see
+how they would work here.</p>
+
+<p>So, as in the case of generics, this mainly means that some elegant APIs are
+not possible in go for library authors (and as I said, in this specific case it
+probably isn&#39;t a very good idea. For example you would have to think about what
+happens, if the user gets the same value in two different goroutines from the
+database).</p>
+
+<p><a name="dynload"></a></p>
+
+<h1>Dynamic loading of go code</h1>
+
+<p>It would be useful to be able to dynamically load go code at runtime, to build
+plugins for go software. Specifically I want a good go replacement for
+<a href="http://jekyllrb.com/">jekyll</a> because I went through some ruby-version-hell
+with it lately (for example <code>jekyll serve -w</code> still does not work for me with
+the version packaged in debian) and I think a statically linked go-binary would
+take a lot of possible pain-points out here. But plugins are a really important
+feature of jekyll for me, so I still want to be able to customize a page with
+plugins (how to avoid introducing the same version hell with this is another
+topic).</p>
+
+<p>The currently recommended ways to do plugins are a) as go-packages and
+recompiling the whole binary for every change of a plugin and b) using
+sub-processes and <a href="http://golang.org/pkg/net/rpc">net/rpc</a>.</p>
+
+<p>I don&#39;t feel a) being a good fit here, because it means maintaining a separate
+binary for every jekyll-site you have which just sounds like a smallish
+nightmare for binary distributions (plus I have use cases for plugins where even
+the relatively small compilation times of go would result in an intolerable
+increase in startup-time).</p>
+
+<p>b) on the other hand results in a lot of runtime-penalty: For example I can not
+really pass interfaces between plugins, let alone use channels or something and
+every function call has to have its parameters and results serialized and
+deserialized.  Where in the same process I can just define a transformation
+between different formats as a <code>func(r io.Reader) io.Reader</code> or something, in
+the RPC-context I first have to transmit the entire file over a socket, or have
+the plugin-author implement a <code>net/rpc</code> server himself and somehow pass a
+reference to it over the wire. This increases the burden on the plugin-authors
+too much, I think.</p>
+
+<p>Luckily, it seems there seems to be
+<a href="https://groups.google.com/forum/#!topic/golang-dev/0_N7DLmrUFA">some thought</a>
+put forward recently on how to implement this, so maybe we see this in the
+nearish future.</p>
+
+<p><a name="gcgoroutines"></a></p>
+
+<h1>Garbage-collected goroutines</h1>
+
+<p>Now, this is the only thing I really don&#39;t understand why it is not part of the
+language. Concurrency in go is a first-class citizen and garbage-collection is
+a feature emphasized all the time by the go-authors as an advantage. Yet, they
+both seem to not play entirely well together, making concurrency worse than it
+has to be.</p>
+
+<p>Something like the standard example of how goroutines and channels work goes a
+little bit like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
+    <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="p">{</span>
+            <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="nx">i</span>
+            <span class="nx">i</span><span class="o">++</span>
+        <span class="p">}</span>
+    <span class="p">}()</span>
+
+    <span class="k">for</span> <span class="p">{</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="o">&lt;-</span><span class="nx">ch</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Now, this is all well, but what if we want to exit the loop prematurely? We
+have to do something like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
+    <span class="nx">done</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">)</span>
+    <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="p">{</span>
+            <span class="k">select</span> <span class="p">{</span>
+                <span class="k">case</span> <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="nx">i</span><span class="p">:</span>
+                    <span class="nx">i</span><span class="o">++</span>
+                <span class="k">case</span> <span class="o">&lt;-</span><span class="nx">done</span><span class="p">:</span>
+                    <span class="k">return</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}()</span>
+    <span class="k">for</span> <span class="p">{</span>
+        <span class="nx">i</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">ch</span>
+        <span class="k">if</span> <span class="nx">i</span> <span class="p">&gt;</span> <span class="mi">1000</span> <span class="p">{</span>
+            <span class="k">break</span>
+        <span class="p">}</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Because otherwise the goroutine would just stay around for all eternity,
+effectively being leaked memory. There are
+<a href="http://youtu.be/f6kdp27TYZs">entire</a> <a href="http://youtu.be/QDDwwePbDtw">talks</a>
+build around this and similar problems, where I don&#39;t really understand why. If
+we add a <code>break</code> to our first version, <code>Foo</code> returns and suddenly, all other
+references to <code>ch</code>, except the one the goroutine is blocking on writing to are
+gone and can be garbage-collected. The runtime can already detect if all
+goroutines are sleeping and we have a deadlock, the garbage-collector can
+accurately see what references there are to a given channel, why can we not
+combine the two to just see &quot;there is absolutely <em>no</em> way, this channel-write
+can <em>ever</em> succeed, so let&#39;s just kill it and gc all it&#39;s memory&quot;? This would
+have zero impact on existing programs (because as you can not get any
+references to goroutines, a deadlocked one can have no side-effect on the rest
+of the program), but it would make channels <em>so</em> much more fun to work with. It
+would make channels as iterators a truly elegant pattern, it would simplify
+<a href="http://blog.golang.org/pipelines">pipelines</a> and it would possibly allow a
+myriad other use cases for channels I can not think of right now. Heck, you
+could even think about (not sure if this is possible or desirable) running any
+deferred statements, when a goroutine is garbage-collected, so all other
+resources held by it will be correctly released.</p>
+
+<p>This is the <em>one</em> thing I really wish to be added to the language. Really
+diving into channels and concurrency right now is very much spoiled for me
+because I always have to think about draining every channel, always think about
+what goroutine closes what channels, passing cancellation-channels…</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

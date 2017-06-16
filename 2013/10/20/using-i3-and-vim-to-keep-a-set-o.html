@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Using i3 and vim to keep a set of notes at hand</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>Using i3 and vim to keep a set of notes at hand</h2>
+<p class="meta">20 Oct 2013</p>
+
+<article class="post">
+<p><strong>tl;dr: Put a terminal with a vim-instance in an i3-scratchpad, combine it
+with autosave-when-idle and you got the perfect note keeping workflow</strong></p>
+
+<p>There are often occasions where I want to write something down, while not
+wanting to disturb my thought-process too much or taking too much of an effort.
+An example for the former would be a short TODO I suddenly remember while doing
+something more important. As an example for the latter, I keep an &quot;account&quot; for
+drinks at our local computer club, so that I don&#39;t always have to put single
+coins into the register, but can just put 20€ or something in and don&#39;t have to
+worry about it for a while. Combining the
+<a href="http://i3wm.org/docs/userguide.html#_scratchpad">scratchpad-window</a> feature of
+i3 with a little vim-magic makes this effortless enough to be actually
+preferable to just paying.</p>
+
+<p>First of, you should map a key to <code>scratchpad show</code> in i3, for example I have
+the following in my config:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">bind Mod4+Shift+21 move scratchpad
+bind Mod4+21 scratchpad show
+</code></pre></div>
+<p>I can then just use <code>Mod4+&lt;backtic&gt;</code> to access the scratchpad.</p>
+
+<p>Now, just put a terminal in scratchpad-mode and open .notes in vim in this
+terminal. By pressing the <code>scratchpad show</code> binding repeatedly, you can send it
+to the background and bring it to the foreground again.</p>
+
+<p>I have my current &quot;balance&quot; in this notes-file and during the meetings of the
+computer club leave the cursor on this balance. If I take a drink, I press <code>^X</code>
+decreasing my balance by one (every drink is one Euro). If I pay, say 10 Euros
+into the register, I press <code>10^A</code> increasing my balance by 10.</p>
+
+<p>This is already much better, but it still has one problem: I better save that
+file every time I change my balance, else a crash would screw up my accounting.
+Luckily, vim provides autocommands and has an event for &quot;the user did not type
+for a while&quot;. This means, that we can automatically save the file if we idled
+for a few seconds, for example if we send the scratchpad window away. For this,
+we put the following in our <code>.vimrc</code>:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">&quot; Automatically save the file notes when idle
+autocmd CursorHold .notes :write
+</code></pre></div>
+<p>Now adjusting my balance is just a matter of a very short key sequence:
+<code>&lt;mod4&gt;`&lt;c-x&gt;&lt;mod4&gt;`</code></p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>

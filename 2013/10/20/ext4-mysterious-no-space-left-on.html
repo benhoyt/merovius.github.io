@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>ext4: Mysterious “No space left on device”-errors</title>
+        <meta name="viewport" content="width=device-width">
+        <link rel="stylesheet" href="/css/syntax.css">
+        <link rel="stylesheet" href="/css/main.css">
+        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
+</script>
+    </head>
+    <body>
+        <div class="site">
+          <div class="header">
+            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
+          </div>
+
+          <h2>ext4: Mysterious “No space left on device”-errors</h2>
+<p class="meta">20 Oct 2013</p>
+
+<article class="post">
+<p><strong>tl;dr: ext4 has a feature called <code>dir_index</code> enabled by default, which is
+quite susceptible to hash-collisions</strong></p>
+
+<p>I am currently restructuring my mail-setup. Currently, I use offlineimap to
+sync my separate accounts to a series of maildirs on my server. I then use sup
+on the server as a MUA. I want to switch to a local setup with notmuch, so I
+set up an dovecot imapd on my server and have all my accounts forward to my
+primary address. I then want to use offlineimap to have my mails in a local
+maildir, which I browse with notmuch.</p>
+
+<p>I then stumbled about a curious problem: When trying to copy my mails from my
+server to my local harddisk, it would fail after about 50K E-mails with the
+message “could not create xyz: no space left on device” (actually, offlineimap
+would just hog all my CPUs and freeze my whole machine in the process, but
+that&#39;s a different story). But there actually was plenty of space left.</p>
+
+<p>It took me and a few friends a whole while to discover the problem. So if you
+ever get this error message (using ext4) you should probably check these four
+things (my issue was the last one):</p>
+
+<h1>Do you <em>actually</em> have enough space?</h1>
+
+<p>Use <code>df -h</code>. There is actually a very common pitfall with ext4. Let&#39;s have a look:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">mero@rincewind ~$ df -h
+Filesystem              Size  Used Avail Use% Mounted on
+/dev/mapper/sda2_crypt  235G  164G   69G  71% /
+...
+</code></pre></div>
+<p>If you add 164G and 69G, you get 233G, which is 2G short of the actual size.
+This is about 1%, but on your system it will likely be more of 5% difference.
+The reason is the distinction between &quot;free&quot; and &quot;available&quot; space. Per default
+on ext4, there are about 5% of &quot;reserved&quot; blocks. This has two reasons: First
+ext4&#39;s performance seems to take a small hit, when almost full. Secondly, it
+leaves a little space for root to login and troubleshoot problems or delete
+some files, when users filled their home-directory. If there was <em>no</em> space
+left, it might well be, that no login is possible anymore (because of the
+creation of temporary files, logfiles, history-files…). So use <code>tune2fs
+&lt;path_to_your_disk&gt;</code> to see, if you have reserved blocks, and how many of them:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep &quot;Reserved block&quot;
+Reserved block count:     2499541
+Reserved blocks uid:      0 (user root)
+Reserved blocks gid:      0 (group root)
+</code></pre></div>
+<h1>Do you have too many files?</h1>
+
+<p>Even though you might have enough space left, it might well be, that you have
+too many files. ext4 allows an enormous amount of files on any file system, but
+it is limited. Checking this is easy: Just use <code>df -i</code>:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">Filesystem               Inodes  IUsed    IFree IUse% Mounted on
+/dev/mapper/sda2_crypt 15622144 925993 14696151    6% /
+...
+</code></pre></div>
+<p>So as you see, that wasn&#39;t the problem with me. But if you ever have the <code>IUse%</code>
+column near 100, you probably want to delete some old files (and you should
+<em>definitely</em> question, how so many files could be created to begin with).</p>
+
+<h1>Do a file system check</h1>
+
+<p>At least some people on the internet say, that something like this has
+happened to them after a crash (coincidentally my system crashed before the
+problem arose. See above comments about offlineimap) and that a file system
+check got rid of it. So you probably want to run <code>fsck -f &lt;path_to_your_disk&gt;</code>
+to run such a check. You probably also want to do that from a live-system, if
+you cannot unmount it (for example if it&#39;s mounted at the root-dir).</p>
+
+<h1>Do you have <code>dir_index</code> enabled?</h1>
+
+<p>So this is the punch line: ext4 has the possibility to hash the filenames of
+its contents. This enhances performance, but has a “small” problem: ext4 does
+not grow its hashtable, when it starts to fill up. Instead it returns -ENOSPC
+or “no space left on device”.</p>
+
+<p>ext4 uses <code>half_md4</code> as a default hashing-mechanism. If I interpret my
+google-results correctly, this uses the md4-hash algorithm, but strips it to 32
+bits. This is a classical example of the
+<a href="http://en.wikipedia.org/wiki/Birthday_problem">birthday-paradox</a>: A 32 bit
+hash means, that there are 4294967296 different hash values available, so if we
+are fair and assume a uniform distribution of hash values, that makes it highly
+unlikely to hit one specific hash. But the probability of hitting two identical
+hashes, given enough filenames, is much much higher. Using the
+<a href="http://en.wikipedia.org/wiki/Birthday_problem#Cast_as_a_collision_problem">formula</a>
+from Wikipedia we get (with about 50K files) a probability of about 25% that a
+newly added file has the same hash. This is a huge probability of failure. If
+on the other hand we take a 64bit hash-function the probability becomes much
+smaller, about 0.00000000007%.</p>
+
+<p>So if you have a lot of files in the same directory, you probably want to switch
+off <code>dir_index</code>, or at least change to a different hash-algorithm. You can
+check if you have <code>dir_index</code> enabled and change the hash, like this:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
+dir_index
+
+# Change the hash-algo to a bigger one
+mero@rincewind ~$ sudo tune2fs -E &quot;hash_alg=tea&quot; /dev/mapper/sda2_crypt
+# Disable it completely
+mero@rincewind ~$ sudo tune2fs -O &quot;^dir_index&quot;
+</code></pre></div>
+<p>Note however, that <code>dir_index</code> and <code>half_md4</code> where choices made for
+performance reasons. So you might experience a performance-hit after this.</p>
+
+<p><strong>UPDATE:</strong> After trying it out, I realized, that the problem actually also
+persists with the tea-hash. I then had a look at <a href="https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout#Hash_Tree_Directories">the
+ext4-documentation</a>
+about the topic and it seems, that the hash is only stored as 32 bits, so it
+actually does not matter what hash we choose, regarding this particular
+problem. So if <code>half_md4</code> is chosen <a href="http://git.whamcloud.com/?p=tools/e2fsprogs.git;a=commitdiff_plain;h=d1070d91b4de8438dc78c034283baaa19b31d25e">because of its better performance and
+collision-resistance</a>
+it actually makes sense to leave it as the default. You can by the way easily
+test and reproduce the issue by using the following on an ext4 file system:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text">for a in `seq 100000`
+do
+        file=`head -c 51 /dev/urandom | base64 | tr &#39;/&#39; &#39;_&#39;`
+        touch $file
+done
+</code></pre></div>
+<p>Curiously, this only gives me about 160 collisions on 100K files (instead of
+about 10K collisions on 60K files), which would suggest, that my original
+sample (meaning my mailbox) exhibits some properties that make collisions more
+likely both on <code>half_md4</code> <em>and</em> <code>tea</code>.</p>
+
+<!--
+
+-->
+</article>
+
+
+          <div class="footer">
+            <div class="contact">
+              <p>
+                Axel Wagner<br />
+                Mathemematician, programmer, crazy person<br />
+              </p>
+            </div>
+            <div class="contact">
+              <p>
+                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
+				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
+                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
+                <a href="/impressum.html">Impressum</a><br />
+              </p>
+            </div>
+          </div>
+        </div>
+    </body>
+</html>
