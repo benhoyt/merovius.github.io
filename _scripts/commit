@@ -1,0 +1,25 @@
+#!/bin/bash -x
+
+set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+COMMIT=$(git rev-parse HEAD)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+cd $REPO_ROOT
+./_scripts/build
+
+WORKDIR=$(mktemp -d)
+function cleanup {
+	[ -z "$WORKDIR" ] || rm -rf "$WORKDIR"
+}
+trap cleanup EXIT
+
+cd $WORKDIR
+tar xzf $REPO_ROOT/site.tar.gz
+export GIT_DIR=$REPO_ROOT/.git
+git checkout master || git checkout --orphan master
+git add .
+git commit -m "Build $BRANCH\n\nBuilt from $COMMIT"
+rm -rf *
+git checkout $BRANCH
+cd $REPO_ROOT

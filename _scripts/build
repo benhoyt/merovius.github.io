@@ -1,0 +1,18 @@
+#!/bin/bash
+
+OUT=$(mktemp -d)
+[ -z "$OUT" ] && exit 1
+
+function cleanup {
+	rm -rf "$OUT"
+}
+trap cleanup EXIT
+
+sudo docker run -i \
+				--read-only \
+				-v `pwd`:/src:ro,Z \
+				--tmpfs /tmp \
+				-v $OUT:/tmp/out:Z \
+				-t merovius/jekyll \
+				/bin/bash -c "jekyll build --destination /tmp/_site && tar czf /tmp/out/site.tar.gz -C /tmp/_site ."
+mv $OUT/site.tar.gz .

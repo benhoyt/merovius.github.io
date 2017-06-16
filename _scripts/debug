@@ -1,0 +1,7 @@
+#!/bin/bash
+exec sudo docker run -i \
+				-v `pwd`:/src:ro,Z \
+				--tmpfs /tmp \
+				-p 4000:4000 \
+				-t merovius/jekyll \
+				/bin/bash
