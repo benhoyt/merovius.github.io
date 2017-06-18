@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="http://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="//blog.merovius.de//atom.xml"/>
-  <updated>2017-06-18T21:01:17+00:00</updated>
+  <updated>2017-06-18T21:14:05+00:00</updated>
   <id>//blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -14,7 +14,7 @@
   <entry>
     <id>//blog.merovius.de//2017/06/18/how-not-to-use-an-http-router</id>
     <link type="text/html" rel="alternate" href="//blog.merovius.de//2017/06/18/how-not-to-use-an-http-router.html"/>
-    <title>How not to use an http-router in go</title>
+    <title>How to not use an http-router in go</title>
     <updated>2017-06-18T22:57:21+00:00</updated>
     <content type="html">&lt;p&gt;&lt;strong&gt;If you don&amp;#39;t write web-thingies in go you can stop reading now. Also, I am
 somewhat snarky in this article. I intend that to be humorous but am probably

@@ -10,7 +10,7 @@
     <description>RSS feed for Between a rock and a crazy place</description>
     <pubDate>Sun, 18 Jun 2017 22:57:21 +0000</pubDate>
     <item>
-      <title>How not to use an http-router in go</title>
+      <title>How to not use an http-router in go</title>
       <link>//blog.merovius.de//2017/06/18/how-not-to-use-an-http-router.html</link>
       <description>
 &lt;p&gt;&lt;strong&gt;If you don’t write web-thingies in go you can stop reading now. Also, I am somewhat snarky in this article. I intend that to be humorous but am probably failing. Sorry for that&lt;/strong&gt;&lt;/p&gt;
