@@ -8,7 +8,16 @@
     <title>Between a rock and a crazy place</title>
     <link>//blog.merovius.de/</link>
     <description>RSS feed for Between a rock and a crazy place</description>
-    <pubDate>Wed, 31 Aug 2016 02:22:38 +0000</pubDate>
+    <pubDate>Sun, 18 Jun 2017 22:57:21 +0000</pubDate>
+    <item>
+      <title>How not to use an http-router in go</title>
+      <link>//blog.merovius.de//2017/06/18/how-not-to-use-an-http-router.html</link>
+      <description>
+&lt;p&gt;&lt;strong&gt;If you don’t write web-thingies in go you can stop reading now. Also, I am somewhat snarky in this article. I intend that to be humorous but am probably failing. Sorry for that&lt;/strong&gt;&lt;/p&gt;
+</description>
+      <pubDate>Sun, 18 Jun 2017 22:57:21 +0000</pubDate>
+      <dc:date>2017-06-18T22:57:21+00:00</dc:date>
+    </item>
     <item>
       <title>I've been diagnosed with ADHD</title>
       <link>//blog.merovius.de//2016/08/31/ive-been-diagnosed-with-adhd.html</link>
@@ -198,6 +207,6 @@
       <pubDate>Sat, 28 Sep 2013 02:08:05 +0000</pubDate>
       <dc:date>2013-09-28T02:08:05+00:00</dc:date>
     </item>
-    <dc:date>2016-08-31T02:22:38+00:00</dc:date>
+    <dc:date>2017-06-18T22:57:21+00:00</dc:date>
   </channel>
 </rss>
