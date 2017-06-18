@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "How not to use an http-router in go"
+title: "How to not use an http-router in go"
 date: 2017-06-18 22:57:21
 ---
 
