@@ -177,7 +177,7 @@ func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	case "PUT":
 		h.handlePut(id)
 	default:
-		http.Error(res, "Only GET and POST are allowed", http.StatusMethodNotAllowed)
+		http.Error(res, "Only GET and PUT are allowed", http.StatusMethodNotAllowed)
 	}
 }
 
