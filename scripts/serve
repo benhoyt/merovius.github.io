@@ -1,8 +1,9 @@
 #!/bin/bash
-exec sudo docker run -i \
+exec sudo docker run -i -t \
 				--read-only \
 				-v `pwd`:/src:ro,Z \
 				--tmpfs /tmp \
 				-p 4000:4000 \
-				-t merovius/jekyll \
+				-w /src/jekyll \
+				merovius/jekyll \
 				jekyll serve --destination /tmp/_site --watch --drafts

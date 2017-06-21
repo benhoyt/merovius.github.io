@@ -8,11 +8,12 @@ function cleanup {
 }
 trap cleanup EXIT
 
-sudo docker run -i \
+sudo docker run -i -t \
 				--read-only \
 				-v `pwd`:/src:ro,Z \
 				--tmpfs /tmp \
 				-v $OUT:/tmp/out:Z \
-				-t merovius/jekyll \
+				-w /src/jekyll \
+				merovius/jekyll \
 				/bin/bash -c "jekyll build --destination /tmp/_site && tar czf /tmp/out/site.tar.gz -C /tmp/_site ."
 mv $OUT/site.tar.gz .
