@@ -87,7 +87,7 @@ tell me for each of these requests:</p>
 
 <p>What handler they map to and what status code do they return (&quot;OK&quot;? &quot;Bad
 Request&quot;? &quot;Not Found&quot;? &quot;Method not allowed&quot;?) in this routing setup?</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="nx">r</span> <span class="o">:=</span> <span class="nx">mux</span><span class="p">.</span><span class="nx">NewRouter</span><span class="p">()</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="nx">r</span> <span class="o">:=</span> <span class="nx">mux</span><span class="p">.</span><span class="nx">NewRouter</span><span class="p">()</span>
 <span class="nx">r</span><span class="p">.</span><span class="nx">PathPrefix</span><span class="p">(</span><span class="s">&quot;/foo&quot;</span><span class="p">).</span><span class="nx">Methods</span><span class="p">(</span><span class="s">&quot;GET&quot;</span><span class="p">).</span><span class="nx">HandlerFunc</span><span class="p">(</span><span class="nx">Foo</span><span class="p">)</span>
 <span class="nx">r</span><span class="p">.</span><span class="nx">PathPrefix</span><span class="p">(</span><span class="s">&quot;/foo/bar&quot;</span><span class="p">).</span><span class="nx">Methods</span><span class="p">(</span><span class="s">&quot;GET&quot;</span><span class="p">).</span><span class="nx">HandlerFunc</span><span class="p">(</span><span class="nx">FooBar</span><span class="p">)</span>
 <span class="nx">r</span><span class="p">.</span><span class="nx">PathPrefix</span><span class="p">(</span><span class="s">&quot;/foo/{user:[a-z]+}&quot;</span><span class="p">).</span><span class="nx">Methods</span><span class="p">(</span><span class="s">&quot;GET&quot;</span><span class="p">).</span><span class="nx">HandlerFunc</span><span class="p">(</span><span class="nx">FooUser</span><span class="p">)</span>
@@ -136,7 +136,7 @@ locally.</p>
 <p><img src="https://i.giphy.com/l4FGmlJviGJcYM2sM.webp" alt="Those where lies, plain and simple"></p>
 
 <p>We are going to use this one helper function:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="c1">// ShiftPath splits off the first component of p, which will be cleaned of</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// ShiftPath splits off the first component of p, which will be cleaned of</span>
 <span class="c1">// relative components before processing. head will never contain a slash and</span>
 <span class="c1">// tail will always be a rooted path without trailing slash.</span>
 <span class="kd">func</span> <span class="nx">ShiftPath</span><span class="p">(</span><span class="nx">p</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="nx">head</span><span class="p">,</span> <span class="nx">tail</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
@@ -154,7 +154,7 @@ correctly handle a request with the correct status code or they delegate to
 another handler which will do that. They only need to know about the immediate
 handlers they delegate to and they only need to know about the sub-path they
 are rooted at:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">App</span> <span class="kd">struct</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">App</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="c1">// We could use http.Handler as a type here; using the specific type has</span>
     <span class="c1">// the advantage that static analysis tools can link directly from</span>
     <span class="c1">// h.UserHandler.ServeHTTP to the correct definition. The disadvantage is</span>
@@ -210,7 +210,7 @@ parses the URL and what the decisions are that it made on its base.</p>
 
 <p>We still need to add some patterns to our application. Let&#39;s add a profile
 handler:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">UserHandler</span> <span class="kd">struct</span><span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">UserHandler</span> <span class="kd">struct</span><span class="p">{</span>
     <span class="nx">ProfileHandler</span> <span class="o">*</span><span class="nx">ProfileHandler</span>
 <span class="p">}</span>
 

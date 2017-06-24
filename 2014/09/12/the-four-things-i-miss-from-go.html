@@ -59,7 +59,7 @@ are anything from &quot;maybe they will get in&quot; to &quot;I don&#39;t unders
 want generics, go has generic programming using interfaces&quot;. To illustrate one
 shortcoming of the (current) interface approach, consider writing a (simple)
 graph-algorithm:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Graph</span> <span class="p">[][]</span><span class="kt">int</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Graph</span> <span class="p">[][]</span><span class="kt">int</span>
 
 <span class="kd">func</span> <span class="nx">DFS</span><span class="p">(</span><span class="nx">g</span> <span class="nx">Graph</span><span class="p">,</span> <span class="nx">start</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">visitor</span> <span class="kd">func</span><span class="p">(</span><span class="kt">int</span><span class="p">))</span> <span class="p">{</span>
     <span class="nx">visited</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">bool</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">g</span><span class="p">))</span>
@@ -83,7 +83,7 @@ graph-algorithm:</p>
 depth-first-search on it. Now imagine, you want to implement this algorithm
 generically (given, a DFS is not really hard enough to justify this, but you
 could just as easily have a more complex algorithm). This could be done like this:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Node</span> <span class="kd">interface</span><span class="p">{}</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Node</span> <span class="kd">interface</span><span class="p">{}</span>
 
 <span class="kd">type</span> <span class="nx">Graph</span> <span class="kd">interface</span> <span class="p">{</span>
     <span class="nx">Neighbors</span><span class="p">(</span><span class="nx">Node</span><span class="p">)</span> <span class="p">[]</span><span class="nx">Node</span>
@@ -112,7 +112,7 @@ type-safety: Even if we write <code>Neighbors(Node) []Node</code> there is no wa
 the compiler, that these instances of <code>Node</code> will actually always be the same.
 So an implementation of the graph interface would have to do type-assertions
 all over the place. Another problem is:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">AdjacencyList</span> <span class="p">[][]</span><span class="kt">int</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">AdjacencyList</span> <span class="p">[][]</span><span class="kt">int</span>
 
 <span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">AdjacencyList</span><span class="p">)</span> <span class="nx">Neighbors</span><span class="p">(</span><span class="nx">n</span> <span class="nx">Node</span><span class="p">)</span> <span class="p">[]</span><span class="nx">Node</span> <span class="p">{</span>
     <span class="nx">i</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.(</span><span class="kt">int</span><span class="p">)</span>
@@ -214,7 +214,7 @@ has to be.</p>
 
 <p>Something like the standard example of how goroutines and channels work goes a
 little bit like this:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
     <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
     <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
         <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span>
@@ -231,7 +231,7 @@ little bit like this:</p>
 </code></pre></div>
 <p>Now, this is all well, but what if we want to exit the loop prematurely? We
 have to do something like this:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
     <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">int</span><span class="p">)</span>
     <span class="nx">done</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">)</span>
     <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>

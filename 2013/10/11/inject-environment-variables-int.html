@@ -39,7 +39,7 @@ everything is linked to <code>libld</code>, so with enough effort this actually 
 <p>For example, suppose you are running <a href="http://i3wm.org">i3wm</a> and want to add
 <code>/home/user/insulterr/insulterr.so</code> to your <code>$LD_PRELOAD</code> in every process
 started by i3:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">$ gdb -p `pidof i3` `which i3`
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>$ gdb -p `pidof i3` `which i3`
 &lt;lots of output of gdb&gt;
 gdb $ call setenv(&quot;LD_PRELOAD&quot;, &quot;/home/user/insulterr/insulterr.so&quot;)
 gdb $ quit

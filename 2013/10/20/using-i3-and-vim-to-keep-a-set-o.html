@@ -38,7 +38,7 @@ preferable to just paying.</p>
 
 <p>First of, you should map a key to <code>scratchpad show</code> in i3, for example I have
 the following in my config:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">bind Mod4+Shift+21 move scratchpad
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>bind Mod4+Shift+21 move scratchpad
 bind Mod4+21 scratchpad show
 </code></pre></div>
 <p>I can then just use <code>Mod4+&lt;backtic&gt;</code> to access the scratchpad.</p>
@@ -58,7 +58,7 @@ Luckily, vim provides autocommands and has an event for &quot;the user did not t
 for a while&quot;. This means, that we can automatically save the file if we idled
 for a few seconds, for example if we send the scratchpad window away. For this,
 we put the following in our <code>.vimrc</code>:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">&quot; Automatically save the file notes when idle
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>&quot; Automatically save the file notes when idle
 autocmd CursorHold .notes :write
 </code></pre></div>
 <p>Now adjusting my balance is just a matter of a very short key sequence:

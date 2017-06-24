@@ -29,7 +29,7 @@ extra space.  So, if b is the array after the algorithm, we want that
 
 <p>Naively, we would solve our problem by doing something like this (I&#39;m using go
 here):</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">Naive</span><span class="p">(</span><span class="nx">vals</span><span class="p">,</span> <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Naive</span><span class="p">(</span><span class="nx">vals</span><span class="p">,</span> <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
     <span class="nx">n</span> <span class="o">:=</span> <span class="nb">len</span><span class="p">(</span><span class="nx">vals</span><span class="p">)</span>
     <span class="nx">res</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">int</span><span class="p">,</span> <span class="nx">n</span><span class="p">)</span>
     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">vals</span> <span class="p">{</span>
@@ -45,7 +45,7 @@ to copy the result back.</p>
 <p>The simplest iteration of this, would be to simply use a sorting-algorithm of
 our choice, but use as a sorting key not the value of the elements, but the
 position of the corresponding field in the permutation array:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kn">import</span> <span class="s">&quot;sort&quot;</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kn">import</span> <span class="s">&quot;sort&quot;</span>
 
 <span class="kd">type</span> <span class="nx">PermSorter</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="nx">vals</span> <span class="p">[]</span><span class="kt">int</span>
@@ -82,7 +82,7 @@ time, if possible.</p>
 the permutation array. Also not part of the original problem, this might pose
 problems if we want to apply the same permutation to multiple arrays. We can
 rectify that in this case by doing the following:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">NDPermSorter</span> <span class="kd">struct</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">NDPermSorter</span> <span class="kd">struct</span> <span class="p">{</span>
     <span class="nx">vals</span> <span class="p">[]</span><span class="kt">int</span>
     <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span>
 <span class="p">}</span>
@@ -112,7 +112,7 @@ observation: If we start at any index and iteratively jump to the <em>target</em
 index of the current one, we will trace out a cycle. If any index is not in the
 cycle, it will create another cycle and both cycles will be disjoint. For
 example the permutation</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">i    0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>i    0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19
 p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
 </code></pre></div>
 <p>will create the following set of cycles:
@@ -121,7 +121,7 @@ p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
 
 <p>So the idea is to resolve every cycle separately, by iterating over the indices
 and moving every element to the place it belongs:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">Cycles</span><span class="p">(</span><span class="nx">vals</span><span class="p">,</span> <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Cycles</span><span class="p">(</span><span class="nx">vals</span><span class="p">,</span> <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="nx">vals</span><span class="p">);</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
         <span class="nx">v</span><span class="p">,</span> <span class="nx">j</span> <span class="o">:=</span> <span class="nx">vals</span><span class="p">[</span><span class="nx">i</span><span class="p">],</span> <span class="nx">perm</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
         <span class="k">for</span> <span class="nx">j</span> <span class="o">!=</span> <span class="nx">i</span> <span class="p">{</span>
@@ -148,7 +148,7 @@ simply negate every index we are done with. This will make a negative index out
 of it and we can check for that if we encounter it later and skip it in this
 case. After we are done, we only need to take care to flip everything back and
 all should be fine:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">NDCycles</span><span class="p">(</span><span class="nx">vals</span><span class="p">,</span> <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">NDCycles</span><span class="p">(</span><span class="nx">vals</span><span class="p">,</span> <span class="nx">perm</span> <span class="p">[]</span><span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
     <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="nx">vals</span><span class="p">);</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
         <span class="k">if</span> <span class="nx">perm</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">&lt;</span> <span class="mi">0</span> <span class="p">{</span>
             <span class="c1">// already correct - unmark and go on</span>

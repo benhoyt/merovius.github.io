@@ -37,7 +37,7 @@ like that (at least go&#39;s bcrypt implementation comes with that).</p>
 existence). A naive query will return an empty result set if the user does not
 exists, so again, obviously, you need to compare against <em>some</em> password, even
 if the user isn&#39;t found. But just doing, for example</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="k">if</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Empty</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="k">if</span> <span class="nx">result</span><span class="p">.</span><span class="nx">Empty</span> <span class="p">{</span>
     <span class="c1">// Compare against a prepared hash of an empty password, to have constant</span>
     <span class="c1">// time check.</span>
     <span class="nx">bcrypt</span><span class="p">.</span><span class="nx">CompareHashAndPassword</span><span class="p">(</span><span class="nx">HashOfEmptyPassword</span><span class="p">,</span> <span class="nx">enteredPassword</span><span class="p">)</span>

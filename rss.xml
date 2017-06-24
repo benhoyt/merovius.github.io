@@ -12,199 +12,2475 @@
     <item>
       <title>How to not use an http-router in go</title>
       <link>//blog.merovius.de//2017/06/18/how-not-to-use-an-http-router.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;If you don’t write web-thingies in go you can stop reading now. Also, I am somewhat snarky in this article. I intend that to be humorous but am probably failing. Sorry for that&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[If you don&#39;t write web-thingies in go you can stop reading now. Also, I am
+somewhat snarky in this article. I intend that to be humorous but am probably
+failing. Sorry for that
+]]></description>
       <pubDate>Sun, 18 Jun 2017 22:57:21 +0000</pubDate>
+      <guid>//blog.merovius.de//2017/06/18/how-not-to-use-an-http-router.html</guid>
+      <content:encoded><![CDATA[**If you don't write web-thingies in go you can stop reading now. Also, I am
+somewhat snarky in this article. I intend that to be humorous but am probably
+failing. Sorry for that**
+
+As everyone™ knows, people need to [stop writing
+routers/muxs](https://twitter.com/bketelsen/status/875435750770089984) in go.
+Some people
+[attribute](https://twitter.com/markbates/status/875517884931473409) the
+abundance of routers to the fact that the `net/http` package fails to provide a
+sufficiently powerful router, so people roll their own. This is also reflected
+in [this post](https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6),
+in which a gopher complains about how complex and hard to maintain it would be
+to route requests using `net/http` alone.
+
+I disagree with both of these. I don't believe the problem is a lack of a
+powerful enough router in the stdlib. I also disagree that routing based purely
+on `net/http` has to be complicated or hard to maintain.
+
+However, I *do* believe that the community currently lacks good guidance on
+*how* to properly route requests using `net/http`. The default result seems to
+be that people assume they are supposed to use `http.ServeMux` and get
+frustrated by it. In this post I want to explain why routers *in general* -
+including `http.ServeMux` - should be avoided and what I consider simple,
+maintainable and scalable routing using nothing but the stdlib.
+
+## But why?
+
+![But why?](https://i.giphy.com/1M9fmo1WAFVK0.webp)
+
+Why do I believe that routers should not be used? I have three arguments for
+that: They need to be very complex to be useful, they introduce strong coupling
+and they make it hard to understand how requests are flowing.
+
+The basic idea of a router/mux is, that you have a single component which
+looks at a request and decides what handler to dispatch it to. In your `func
+main()` you then create your router, you define all your routes with all your
+handlers and then you call `Serve(l, router)` and everything's peachy.
+
+But since URLs can encode a lot of important information to base your routing
+decisions on, doing it this way requires a lot of extra features. The [stdlib
+ServeMux](https://godoc.org/net/http#ServeMux) is an incredibly simple router
+but even that contains a certain amount of magic in its routing decisions;
+depending on whether a pattern contains a trailing slash or not it might either
+be matched as a prefix or as a complete URL and longer patterns take precedence
+over shorter ones and oh my. But the stdlib router isn't even powerful enough.
+Many people need to match URLs like `"/articles/{category}/{id:[0-9]+}"` in
+their router and while we're at it also extract those nifty arguments. So
+they're using [gorilla/mux](https://godoc.org/github.com/gorilla/mux) instead.
+An awful lot of code to route requests.
+
+Now, without cheating (and actually knowing that package counts as cheating),
+tell me for each of these requests:
+
+* `GET /foo`
+* `GET /foo/bar`
+* `GET /foo/baz`
+* `POST /foo`
+* `PUT /foo`
+* `PUT /foo/bar`
+* `POST /foo/123`
+
+What handler they map to and what status code do they return ("OK"? "Bad
+Request"? "Not Found"? "Method not allowed"?) in this routing setup?
+
+```go
+r := mux.NewRouter()
+r.PathPrefix("/foo").Methods("GET").HandlerFunc(Foo)
+r.PathPrefix("/foo/bar").Methods("GET").HandlerFunc(FooBar)
+r.PathPrefix("/foo/{user:[a-z]+}").Methods("GET").HandlerFunc(FooUser)
+r.PathPrefix("/foo").Methods("POST").HandlerFunc(PostFoo)
+```
+
+What if you permute the lines in the routing-setup?
+
+You might guess correctly. You might not. There are multiple sane routing
+strategies that you could base your guess on. The routes might be tried in
+source order. The routes might be tried in order of specificity. Or a
+complicated mixture of all of them. The router might realize that it could
+match a Route if the method were different and return a 405. Or it might not not. Or that
+`/foo/123` is, technically, an illegal argument, not a missing page. I couldn't
+really find a good answer to any of these questions in the documentation of
+`gorilla/mux` for what it's worth. Which meant that when my web app suddenly
+didn't route requests correctly, I was stumped and needed to dive into code.
+
+You could say that people just have to learn how `gorilla/mux` decides it's
+routing (I believe it's "as defined in source order", by the way). But there
+are at least fifteen thousand routers for go and no newcomer to your
+application will ever know all of them. When a request does the wrong thing, I
+don't want to have to debug your router first to find out what handler it is
+actually going to and then debug that handler. I want to be able to follow the
+request through your code, even if I have next to zero familiarity with it.
+
+Lastly, this kind of setup requires that all the routing decisions for your
+application are done in a central place. That introduces edit-contention, it
+introduces strong coupling (the router needs to be aware of all the paths and
+packages needed in the whole application) and it becomes unmaintainable after a
+while. You can alleviate that by delegating to subrouters though; which really
+is the basis of how I prefer to do all of this these days.
+
+## How to use the stdlib to route
+
+Let's build the toy example from [this medium post](https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6).
+It's not terribly complicated but it serves nicely to illustrate the general
+idea. The author intended to show that using the stdlib for routing would be
+too complicated and wouldn't scale. But my thesis is that the issue is that
+*they are effectively trying to write a router*. They are trying to
+encapsulate all the routing decisions into one single component. Instead,
+separate concerns and make small, easily understandable routing decisions
+locally.
+
+Remember how I told you that we're going to use only the stdlib for routing?
+
+![Those where lies, plain and simple](https://i.giphy.com/l4FGmlJviGJcYM2sM.webp)
+
+We are going to use this one helper function:
+
+```go
+// ShiftPath splits off the first component of p, which will be cleaned of
+// relative components before processing. head will never contain a slash and
+// tail will always be a rooted path without trailing slash.
+func ShiftPath(p string) (head, tail string) {
+	p = path.Clean("/" + p)
+	i := strings.Index(p[1:], "/") + 1
+	if i <= 0 {
+		return p[1:], "/"
+	}
+	return p[1:i], p[i:]
+}
+```
+
+Let's build our app. We start by defining a handler type. The premise of this
+approach is that handlers are strictly separated in their concerns. They either
+correctly handle a request with the correct status code or they delegate to
+another handler which will do that. They only need to know about the immediate
+handlers they delegate to and they only need to know about the sub-path they
+are rooted at:
+
+```go
+type App struct {
+	// We could use http.Handler as a type here; using the specific type has
+	// the advantage that static analysis tools can link directly from
+	// h.UserHandler.ServeHTTP to the correct definition. The disadvantage is
+	// that we have slightly stronger coupling. Do the tradeoff yourself.
+	UserHandler *UserHandler
+}
+
+func (h *App) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	var head string
+	head, req.URL.Path = ShiftPath(req.URL.Path)
+	if head == "user" {
+		h.UserHandler.ServeHTTP(res, req)
+		return
+	}
+	http.Error(res, "Not Found", http.StatusNotFound)
+}
+
+type UserHandler struct {
+}
+
+func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	var head string
+	head, req.URL.Path = ShiftPath(req.URL.Path)
+	id, err := strconv.Atoi(head)
+	if err != nil {
+		http.Error(res, fmt.Sprintf("Invalid user id %q", head), http.StatusBadRequest)
+		return
+	}
+	switch req.Method {
+	case "GET":
+		h.handleGet(id)
+	case "PUT":
+		h.handlePut(id)
+	default:
+		http.Error(res, "Only GET and PUT are allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func main() {
+	a := &App{
+		UserHandler: new(UserHandler),
+	}
+	http.ListenAndServe(":8000", a)
+}
+```
+
+This seems very simple to me (not necessarily in "lines of code" but
+definitely in "understandability"). You don't need to know anything about any
+routers. If you want to understand how the request is routed you start by
+looking at `main`. You see that `(*App).ServeHTTP` is used to serve any
+request so you `:GoDef` to its definition. You see that it decides to dispatch
+to `UserHandler`, you go to its `ServeHTTP` method and you see directly how it
+parses the URL and what the decisions are that it made on its base.
+
+We still need to add some patterns to our application. Let's add a profile
+handler:
+
+```go
+type UserHandler struct{
+	ProfileHandler *ProfileHandler
+}
+
+func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	var head string
+	head, req.URL.Path = ShiftPath(req.URL.Path)
+	id, err := strconv.Atoi(head)
+	if err != nil {
+		http.Error(res, fmt.Sprintf("Invalid user id %q", head), http.StatusBadRequest)
+		return
+	}
+
+	if req.URL.Path != "/" {
+		head, tail := ShiftPath(req.URL.Path)
+		switch head {
+		case "profile":
+			// We can't just make ProfileHandler an http.Handler; it needs the
+			// user id. Let's instead…
+			h.ProfileHandler.Handler(id).ServeHTTP(res, req)
+		case "account":
+			// Left as an exercise to the reader.
+		default:
+			http.Error(res, "Not Found", http.StatusNotFound)
+		}
+		return
+	}
+	// As before
+	...
+}
+
+type ProfileHandler struct {
+}
+
+func (h *ProfileHandler) Handler(id int) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		// Do whatever
+	})
+}
+```
+
+This may, again, seem complicated but it has the cool advantage that the
+dependencies of `ProfileHandler` are clear at compile time. It needs a user id
+which needs to come from *somewhere*. Providing it via this kind of method
+ensures this is the case. When you refactor your code, you won't accidentally
+forget to provide it; it's impossible to miss!
+
+There are two potential alternatives to this if you prefer them: You could put
+the user-id into `req.Context()` or you could be super-hackish and add them to
+`req.Form`. But I prefer it this way.
+
+You might argue that `App` still needs to know all the transitive dependencies
+(because they are members, transitively) so we haven't actually reduced
+coupling. But that's not true. Its `UserHandler` could be created by a
+`NewUserHandler` function which gets passed its dependencies via the mechanism
+of your choice (flags, dependency injection,…) and gets wired up in `main`. All
+`App` needs to know is the API of the handlers it's *directly* invoking.
+
+## Conclusion
+
+I hope I convinced you that routers *in and off itself* are harmful. Pulling
+the routing into one component means that that component needs to encapsulate
+an awful lot of complexity, making it hard to debug. And as no single existing
+router will contain all the complicated cleverness you want to base your
+routing decisions on, you are tempted to write your own. Which everyone does.
+
+Instead, split your routing decisions into small, independent chunks and
+express them in their own handlers. And wire the dependencies up at compile
+time, using the type system of go, and reduce coupling.
+]]></content:encoded>
       <dc:date>2017-06-18T22:57:21+00:00</dc:date>
     </item>
     <item>
       <title>I've been diagnosed with ADHD</title>
       <link>//blog.merovius.de//2016/08/31/ive-been-diagnosed-with-adhd.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I’ve been diagnosed with ADHD. I ramble incoherently for a while and I might do some less rambling posts about it in the future.&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I&#39;ve been diagnosed with ADHD. I ramble incoherently for a while and I
+might do some less rambling posts about it in the future.
+]]></description>
       <pubDate>Wed, 31 Aug 2016 02:22:38 +0000</pubDate>
+      <guid>//blog.merovius.de//2016/08/31/ive-been-diagnosed-with-adhd.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I've been diagnosed with ADHD. I ramble incoherently for a while and I
+might do some less rambling posts about it in the future.**
+
+As the title says, I've been recently diagnosed with ADHD and I thought I'd try
+to be as open about it as possible and share my personal experiences with
+mental illness. That being said, I am also adding the disclaimer, that I have
+no training or special knowledge about it and that the fact that I have been
+*diagnosed* with ADHD does not mean I am an authoritative source on its
+effects, that this diagnoses is going to stick or that my experiences in any
+way generalize to other people who got the same diagnosis.
+
+This will hopefully turn into a bit of a series of blog posts and I'd like to
+start it off with a general description of what lead me to look for a diagnosis
+and treatment in the first place. Some of the things I am only touching on here
+I might write more about in the future (see below for a non-exhaustive list).
+Or not. I have not yet decided :)
+
+---
+
+It is no secret (it's actually kind of a running gag) that I am a serious
+procrastinator. I always had trouble starting on something and staying with it;
+my graveyard of unfinished projects is huge. For most of my life, however, this
+hasn't been a huge problem to me. I was reasonably successful in compensating
+for it with a decent amount of intelligence (arrogant as that sounds). I never
+needed any homework and never needed to learn for tests in school and even
+at university I only spent very little time on both. The homework we got was
+short-term enough that procrastination was not a real danger, I finished it
+quickly and whenever there *was* a longer-term project to finish (such as a
+seminar-talk or learning for exams) I could cram for a night and get enough of
+an understanding of things to do a decent job.
+
+However, that strategy did not work for either my bachelor, nor my master
+thesis, which predictably lead to both turning out a lot worse than I would've
+wished for (I am not going to go into too much detail here). Self-organized
+long-term work seemed next to impossible. This problem got *much* worse when I
+started working full-time. Now almost all my work was self-organized and
+long-term. Goals are set on a quarterly basis, the decision when and how and
+how much to work is completely up to you. Other employers might frown at their
+employees slacking off at work; where I work, it's almost expected. I was good
+at being oncall, which is mainly reactive, short-term problem solving. But I
+was (and am) completely dissatisfied with my project work. I felt that I did
+not get nearly as much done as I should or as I would *want*. My projects in my
+first quarter had very clear deadlines and I finished on time (I still
+procrastinated, but at least at some point I sat down until I got it done. It
+still meant staying at work until 2am the day before the deadline) but after
+that it went downhill fast, with projects that needed to be done ASAP, but not
+with a *deadline*. So I started slipping. I didn't finish my projects (in fact,
+the ones that I didn't drop I am still not done with), I spent weeks doing
+effectively nothing (I am not exaggerating here. I spent whole weeks not
+writing a single line of code, closing a single bug or running a single
+command, doing nothing but browse reddit, twitter and wasting my time in
+similar ways. Yes, you can waste a week doing nothing, while sitting at your
+desk), not being able to get myself to start working on anything and hating
+myself for it.
+
+And while I am mostly talking about work, this affected my personal life too.
+Mail remains unopened, important errands don't get done, I am having trouble
+keeping in contact with friends, because I can always write or visit them some
+other time…
+
+I tried (and had tried over the past years) several systems to organize myself
+better, to motivate myself and to remove distractions. I was initially
+determined to try to solve my problems on my own, that I did not really need
+professional help. However, at some point, I realized that I won't be able to
+fix this just by willing myself to it. I realized it in the final months of
+my master thesis, but convinced myself that I [don't have time to fix it
+properly, after all, I have to write my
+thesis](https://media.licdn.com/mpr/mpr/AAEAAQAAAAAAAAJWAAAAJDIwZTMwODMwLThkZTYtNDU4Ny04ZmI3LTE3N2E2MWYxZGVlMA.jpg).
+I then kind of forgot about it (or rather: I procrastinated it) in the
+beginning of starting work, because things where going reasonably well. But it
+came back to me around the start of this year. After not finishing any of my
+projects in the first quarter. And after telling my coworkers and friends of my
+problems and them telling me that it's just impostor syndrome and a distorted
+view of myself (I'll go into why they where wrong some more later, possibly).
+
+I couldn't help myself and I couldn't get effective help from my coworkers. So,
+in April, I finally decided to see a Psychologist. Previously the fear of
+the potential cost (or the stress of dealing with how that works with my
+insurance), the perceived complexity of finding one that is both accepting
+patients that are only publicly insured and is specialized on my particular
+kinds of issues and the perceived lack of time prevented me from doing so.
+Apart from a general doubt about its effectiveness and fear of the
+implications for my self-perception and world-view, of course.
+
+Luckily one of the employee-benefits at my company is free and uncomplicated
+access to a Mental Health (or "Emotional well-being", what a fun euphemism)
+provider. It only took a single E-Mail and the meetings happen around 10 meters
+away from my desk. So I started seeing a psychologist on a regular basis (on
+average probably every one and a half weeks or so) and talking about my issues.
+I explained and described my problems and it went about as good as I feared;
+they tried to convince me that the real issue isn't my performance, but my
+perception of it (and I concede that I still have trouble coming up with hard,
+empirical evidence to present to people. Though it's performance review season
+right now. As I haven't done anything of substance in the past 6 months, maybe
+I will finally get that evidence…) and they tried to get me to adopt more
+systems to organize myself and remove distractions. All the while, I got worse
+and worse. My inability to get even the most basic things done or to
+concentrate even for an hour, even for five minutes, on anything of substance,
+combined with the inherent social isolation of moving to a new city and
+country, lead me into deep depressive episodes.
+
+Finally, when my Psychologist in a session tried to get me to write down what
+was essentially an [Unschedule](http://www.neilfiore.com/now-habit-schedules/)
+(a system I knew about from reading "The Now Habit" myself when working at my
+bachelor thesis and that I even had moderate success with; for about two
+weeks), I broke down. I told them that I do not consider this a valuable use of
+these sessions, that I tried systems before, that I tried *this particular*
+system before and that I can find these kind of lifestyle advise on my own, in
+my free time. That the reason I was coming to these sessions was to get
+systematic, medical, professional help of the kind that I *can't* get from
+books. So we agreed, at that point, to pursue a diagnosis, as a precondition
+for treatment.
+
+Which, basically, is where we are at now. The diagnostic process consisted of
+several sessions of questions about my symptoms, my childhood and my life in
+general, of filling out a couple of diagnostic surveys and having my siblings
+fill them out too (in the hope that they can fill in some of the blanks in my
+own memory about my childhood) and of several sessions of answering more
+questions from more surveys. And two weeks ago, I officially got the diagnosis
+ADHD. And the plan to attack it by a combination of therapy and medication (the
+latter, in particular, is *really* hard to get from books, for some reason :) ).
+
+I just finished my first day on
+[Methylphenidate](https://en.wikipedia.org/wiki/Methylphenidate) (the active
+substance in Ritalin), specifically Concerta. And though this is definitely
+*much* too early to actually make definitive judgments on its effects and
+effectiveness, at least for this one day I was feeling really great and
+actively happy. Which, coincidentally, helped me to finally start on this post,
+to talk about mental health issues; a topic I've been wanting to talk about
+ever since I started this blog (again), but so far didn't really felt I could.
+
+---
+
+As I said, this is hopefully the first post in a small ongoing series. I am
+aware that it is long, rambling and probably contentious. It definitely won't get
+all my points across and will change the perception some people have of me (I
+can hear you thinking how all of this doesn't really speak "mental illness",
+how it seems implausible that someone with my CV would actually, objectively,
+get nothing done and how I am a drama queen and shouldn't try to solve my
+problems with dangerous medication). It's an intentionally broad overview of my
+process and its main purpose is to "out" myself publicly and create starting
+points for multiple, more specific, concise, interesting and convincing posts
+in the future. Things I might, or might not talk about are
+
+* My specific symptoms and how this has and still is influencing my life (and
+  how, yes, this is actual an *illness*, not just a continuous label). In
+  particular, there are things I wasn't associating with ADHD, which turn out
+  to be relatively tightly linked.
+* How my medication is specifically affecting me and what it does to those
+  symptoms. I can not overstate how *fascinated* I am with today's experience.
+  I was wearing a visibly puzzled expression all day because I couldn't figure
+  out what was happening. And then I couldn't stop smiling. :)
+* Possibly things about my therapy? I really don't know what to expect about
+  that, though. Therapy is kind off the long play, so it's much harder to
+  evaluate and talk about its effectiveness.
+* Why I consider us currently to be in the Middle Ages of mental health and why
+  I think that in a hundred years or so people will laugh at how we currently
+  deal with it. And possibly be horrified.
+* My over ten years (I'm still young, mkey‽) of thinking about my own mental
+  health and mental health in general and my thoughts of how mental illness
+  interacts with identity and self-definition.
+* How much I *loathe* the term "impostor syndrome" and why I am (still)
+  convinced that I don't get enough done, even though I can't produce empirical
+  evidence for that and people try to convince me otherwise. And what it does
+  to you, to need to take the "I suck" side of an argument and still don't have
+  people believe you.
+
+Let me know, what you think :)
+]]></content:encoded>
       <dc:date>2016-08-31T02:22:38+00:00</dc:date>
     </item>
     <item>
       <title>Backwards compatibility in go</title>
       <link>//blog.merovius.de//2015/07/29/backwards-compatibility-in-go.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: There are next to no “backwards compatible API changes” in go. You should explicitely name your compatibility-guarantees.&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: There are next to no &quot;backwards compatible API changes&quot; in go. You
+should explicitely name your compatibility-guarantees.
+]]></description>
       <pubDate>Wed, 29 Jul 2015 01:10:11 +0000</pubDate>
+      <guid>//blog.merovius.de//2015/07/29/backwards-compatibility-in-go.html</guid>
+      <content:encoded><![CDATA[**tl;dr: There are next to no "backwards compatible API changes" in go. You
+should explicitely name your compatibility-guarantees.**
+
+I really love go, I really hate vendoring and up until now I didn't really get,
+why anyone would think go should need something like that. After all, go seems
+to be predestined to be used with automatically checked semantic versioning.
+You can enumerate all possible changes to an API in go and the list is quite
+short. By looking at vcs-tags giving semantic versions and diffing the API, you
+can automatically check that you never break compatibility (the go compiler and
+stdlib actually do something like that). Heck, in theory you could even write a
+package manager that automatically (without any further annotations) determines
+the latest version of a package that still builds all your stuff or gives you
+the minimum set of packages that need changes to reconcile conflicts.
+
+This thought lead me to contemplate what makes an API change a breaking
+change. After a bit of thought, my conclusion is that almost every API change
+is a breaking change, which might surprise you.
+
+For this discussion we first need to make some assumptions about what
+constitutes breakage. We will use the [go1 compatibility promise](http://golang.org/doc/go1compat).
+The main gist is: Stuff that builds before is guaranteed to build after.
+Notable exceptions (apart from necessary breakages due to security or other
+bugs) are unkeyed struct literals and dot-imports.
+
+**[edit]**
+I should clarify, that whenever I talk about an API-change, I mean
+your exported API as defined by Code (as opposed to comments/documentation).
+This includes the public identifiers exported by your package, including type
+information. It excludes API-requirements specified in documentation, like on
+[io.Writer](http://golang.org/pkg/io/#Writer). These are just too complex to
+talk about in a meaningful way and must be dealt with separately anyway.
+**[/edit]**
+
+So, given this definition of breakage, we can start enumerating all the
+possible changes you could do to an API and check whether they are breaking
+under the definition of the go1 compatibility promise:
+
+# Adding func/type/var/const at package scope
+
+This is the only thing that seems to be fine under the stability guarantee.  It
+turns out the go authors thought about this one and put the exception of
+dot-imports into the compatibility promise, which is great.
+
+dot-imports are imports of the form `. import "foo"`. They import every
+package-level identifier of package `foo` into the scope of the current file.
+
+Absence of dot-imports means, every identifier at your package scope must be
+referenced with a selector-expression (i.e. `foo.Bar`) which can't be redeclared
+by downstream. It also means that you should never use dot-imports in your
+packages (which is a bad idea for other reasons too). Treat dot-imports as a
+historic artifact which is completely deprecated. An exception is the need
+to use a separate `foo_test` package for your tests to break dependency cycles.
+In that case it is widely deemed acceptable to `. import "foo"` to save typing
+and add clarity.
+
+# Removing func/type/var/const at package scope
+
+Downstream might use the removed function/type/variable/constant, so this is
+obviously a breaking change.
+
+# Adding a method to an interface
+
+Downstream might want to create an implementation of your interface and try to
+pass it. After you add a method, this type doesn't implement your interface
+anymore and downstreams code will break.
+
+# Removing a method from an interface
+
+Downstream might want to call this method on a value of your interface type, so
+this is obviously a breaking change.
+
+# Adding a field to a struct
+
+This is perhaps surprising, but adding a field to a struct is a breaking
+change. The reason is, that downstream might embed two types into a struct. If
+one of them has a field or method Bar and the other is a struct you added the
+Field Bar to, downstream will fail to build (because of an ambiguous selector
+expression).
+
+So, e.g.:
+
+```go
+// foo/foo.go
+package foo
+
+type Foo struct {
+	Foo string
+	Bar int // Added after the fact
+}
+
+// bar/bar.go
+package bar
+
+type Baz struct {
+	Bar int
+}
+
+type Spam struct {
+	foo.Foo
+	Baz
+}
+
+func Eggs() {
+	var s Spam
+	s.Bar = 42 // ambiguous selector s.Bar
+}
+```
+
+This is what the compatibility *might* refer to with the following quote:
+
+> Code that uses unkeyed struct literals (such as pkg.T{3, "x"}) to create values
+> of these types would fail to compile after such a change. However, code that
+> uses keyed literals (pkg.T{A: 3, B: "x"}) will continue to compile after such a
+> change.  We will update such data structures in a way that allows keyed struct
+> literals to remain compatible, although unkeyed literals may fail to compile.
+> (**There are also more intricate cases involving nested data structures or
+> interfaces**, but they have the same resolution.)
+
+(emphasis is mine). By "the same resolution" they *might* refer to only accessing
+embedded Fields via a keyed selector (so e.g. `s.Baz.Bar` in above example). If
+so, that is pretty obscure and it makes struct-embedding pretty much
+useless. Every usage of a field or method of an embedded type must be
+explicitly Keyed, which means you can just *not* embed it after all. You need
+to write the selector and wrap every embedded method anyway.
+
+I hope we all agree that type embedding is awesome and shouldn't need to be
+avoided :)
+
+# Removing a field from a struct
+
+Downstream might use the now removed field, so this is obviously a breaking change.
+
+# Adding a method to a type
+
+The argument is pretty much the same as adding a field to a struct: Downstream
+might embed your type and suddenly get ambiguities.
+
+# Removing a method from a type
+
+Downstream might call the now removed method, so this is obviously a breaking change.
+
+# Changing a function/method signature
+
+Most changes are obviously breaking. But as it turns out you can't do *any*
+change to a function or method signature. This includes adding a variadic
+argument which *looks* backwards compatible on the surface. After all, every
+call site will still be correct, right?
+
+The reason is, that downstream might save your function or method in a variable
+of the old type, which will break because of nonassignable types.
+
+# Conclusion
+
+It looks to me like anything that isn't just adding a new Identifier to the
+package-scope will potentially break *some* downstream. This severely limits
+the kind of changes you can do to your API if you want to claim backwards
+compatibility.
+
+This of course doesn't mean that you should never ever make any changes to your
+API ever. But you should think about it and you should clearly document, what
+kind of compatibility guarantees you make. When you do any changes named in
+this document, you should check your downstreams, whether they are affected by
+it. If you claim a similar level of compatibility as the go standard library,
+you should definitely be aware of the implications and what you can and can't
+do.
+
+We, the go community, should probably come up with some coherent definition of
+what changes we deem backwards compatible and which we don't. A tool to
+automatically looks up all your (public) importerts on
+[godoc.org](https://godoc.org/), downloads the latest version and tries to
+build them with your changes should be fairly simple to write in go (and may
+even already exist). We should make it a standard check (like go vet and
+golint) for upstream package authors to do that kind of thing before push to
+prevent frustrated downstreams.
+
+Of course there is still the possibility, that my reading of the go1
+compatibility promise is wrong or inaccurate. I would welcome comments on that,
+just like on everything else in this post :)
+]]></content:encoded>
       <dc:date>2015-07-29T01:10:11+00:00</dc:date>
     </item>
     <item>
       <title>Lazy evaluation in go</title>
       <link>//blog.merovius.de//2015/07/17/lazy-evaluation-in-go.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I did &lt;a href=&quot;https://godoc.org/merovius.de/go-misc/lazy&quot;&gt;lazy evaluation in go&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I did lazy evaluation in go
+]]></description>
       <pubDate>Fri, 17 Jul 2015 19:31:10 +0000</pubDate>
+      <guid>//blog.merovius.de//2015/07/17/lazy-evaluation-in-go.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I did [lazy evaluation in go](https://godoc.org/merovius.de/go-misc/lazy)**
+
+A small pattern that is usefull for some algorithms is [lazy
+evaluation](https://en.wikipedia.org/wiki/Lazy_evaluation). Haskell is famous
+for making extensive use of it. One way to emulate goroutine-safe lazy
+evaluation is using closures and [the sync-package](https://godoc.org/sync):
+
+```go
+type LazyInt func() int
+
+func Make(f func() int) LazyInt {
+	var v int
+	var once sync.Once
+	return func() int {
+		once.Do(func() {
+			v = f()
+			f = nil // so that f can now be GC'ed
+		})
+		return v
+	}
+}
+
+func main() {
+	n := Make(func() { return 23 }) // Or something more expensive…
+	fmt.Println(n())                // Calculates the 23
+	fmt.Println(n() + 42)           // Reuses the calculated value
+}
+```
+
+This is not the fastest possible code, but it already has less overhead than
+one would think (and it is pretty simple to deduce a faster implementation from
+this). I have implemented a [simple command](https://godoc.org/merovius.de/go-misc/cmd/go-lazy),
+that generates these implementations (or rather, more optimized ones based on
+the same idea) for different
+[types](https://godoc.org/merovius.de/go-misc/lazy).
+
+This is of course just the simplest use-case for lazynes. In practice, you might also want Implementations of Expressions
+
+```go
+func LazyAdd(a, b LazyInt) LazyInt {
+	return Make(func() { return a() + b() })
+}
+```
+
+or lazy slices (slightly more complicated to implement, but possible) but I
+left that for a later improvement of the package (plus, it makes the already
+quite big API even bigger) :)
+]]></content:encoded>
       <dc:date>2015-07-17T19:31:10+00:00</dc:date>
     </item>
     <item>
       <title>Difficulties making SQL based authentication resilient against timing attacks</title>
       <link>//blog.merovius.de//2015/04/13/difficulties-making-sql-based-au.html</link>
-      <description>
-&lt;p&gt;I’ve been thinking about how to do an authentication scheme, that uses some kind of relational database (it doesn’t matter specifically, that the database is relational, the concerns should pretty much apply to all databases) as a backing store, in a way that is resilient against timing side-channel attacks and doesn’t leak any data about which usernames exist in the system and which don’t.&lt;/p&gt;
-</description>
+      <description><![CDATA[I&#39;ve been thinking about how to do an authentication scheme, that uses some
+kind of relational database (it doesn&#39;t matter specifically, that the database
+is relational, the concerns should pretty much apply to all databases) as a
+backing store, in a way that is resilient against timing side-channel attacks
+and doesn&#39;t leak any data about which usernames exist in the system and which
+don&#39;t.
+]]></description>
       <pubDate>Mon, 13 Apr 2015 02:49:53 +0000</pubDate>
+      <guid>//blog.merovius.de//2015/04/13/difficulties-making-sql-based-au.html</guid>
+      <content:encoded><![CDATA[I've been thinking about how to do an authentication scheme, that uses some
+kind of relational database (it doesn't matter specifically, that the database
+is relational, the concerns should pretty much apply to all databases) as a
+backing store, in a way that is resilient against timing side-channel attacks
+and doesn't leak any data about which usernames exist in the system and which
+don't.
+
+The first obvious thing is, that you need to do a constant time comparison of
+password-hashes. Luckily, most modern crypto libraries should include something
+like that (at least go's bcrypt implementation comes with that).
+
+But now the question is, how you prevent enumerating users (or checking for
+existence). A naive query will return an empty result set if the user does not
+exists, so again, obviously, you need to compare against *some* password, even
+if the user isn't found. But just doing, for example
+
+```go
+if result.Empty {
+	// Compare against a prepared hash of an empty password, to have constant
+	// time check.
+	bcrypt.CompareHashAndPassword(HashOfEmptyPassword, enteredPassword)
+} else {
+	bcrypt.CompareHashAndPassword(result.PasswordHash, enteredPassword)
+}
+```
+
+won't get you very far. Because (for example) the CPU will predict either of
+the two branches (and the compiler might or might not decide to "help" with
+that), so again an attacker might be able to distinguish between the two cases.
+The best way, to achieve resilience against timing side-channels is to make
+sure, that your control flow does not depend on input data *at all*. Meaning no
+branch or loop should ever take in any way into account, what is actually input
+into your code (including the username and the result of the database query).
+
+So my next thought was to modify the query to return the hash of an empty
+password as a default, if no user is found. That way, your code is guaranteed
+to always get a well-defined bcrypt-hash from the database and your control
+flow does not depend on whether or not the user exists (and an empty password
+can be safely excluded in advance, as returning early for that does not give
+any new data to the attacker).
+
+Which sounds well, but now the question is, if maybe the timing *of your
+database query* tells the attacker something. And this is where I hit a
+roadblock: If the attacker knows enough about your code (i.e. what database
+engine you are using, what machine you are running on and what kind of indices
+your database uses) they can potentially enumerate users by timing your
+database queries. To illustrate: If you would use a simple linear list as an
+index, a failed search has to traverse the whole list, whereas a successfull
+search will abort early. The same issue exists with balanced trees. An attacker
+could potentially hammer your application with unlikely usernames and measure
+the mean time to answer. They can then test individual usernames and measure if
+the time to answer is significantly below the mean for failures, thus
+enumerating usernames.
+
+Now, I haven't tested this for practicality yet (might be fun) and it is pretty
+likely that this can't be exploited in reality. Also, the possibility of
+enumerating users isn't particularly desirable, but it is also far from a
+security meltdown of your authentication-system. Nevertheless, the idea that
+this theoretical problem exists makes me uneasy.
+
+An obvious fix would be to make sure, that every query always has to search
+the complete table on every lookup. I don't know if that is possible, it might
+be just trivial by not giving a limit and not marking the username column as
+unique, but it might also be hard and database-dependent because there will
+still be an index over this username column which might still create the same
+kind of issues. There will also likely still be a variance, because we
+basically just shifted the condition from our own code into the DBMS. I have
+simply no idea.
+
+So there you have it. I am happy to be corrected and pointed to some trivial
+design. I will likely accept the possibity of being vulnerable here, as the
+systems I am currently building aren't that critical. But I will probably still
+have a look at how other projects are handling this. And maybe if there really
+is a problem in practice.
+]]></content:encoded>
       <dc:date>2015-04-13T02:49:53+00:00</dc:date>
     </item>
     <item>
       <title>The four things I miss about go</title>
       <link>//blog.merovius.de//2014/09/12/the-four-things-i-miss-from-go.html</link>
-      <description>
-&lt;p&gt;As people who know me know, my current favourite language is &lt;a href=&quot;http://golang.org/&quot;&gt;go&lt;/a&gt;. One of the best features of go is the lack of features. This is actually the reason I preferred C over most scripting languages for a long time – it does not overburden you with language-features that you first have to wrap your head around. You don’t have to think for a while about what classes or modules or whatever you want to have, you just write your code down and the (more or less) entire language can easily fit inside your head. One of the best writeups of this (contrasting it with python) was done by Gustavo Niemeyer in a &lt;a href=&quot;http://blog.labix.org/2012/06/26/less-is-more-and-is-not-always-straightforward&quot;&gt;blogpost&lt;/a&gt; a few years back.&lt;/p&gt;
-</description>
+      <description><![CDATA[As people who know me know, my current favourite language is
+go. One of the best features of go is the lack of
+features. This is actually the reason I preferred C over most scripting
+languages for a long time – it does not overburden you with language-features
+that you first have to wrap your head around. You don&#39;t have to think for a
+while about what classes or modules or whatever you want to have, you just
+write your code down and the (more or less) entire language can easily fit
+inside your head. One of the best writeups of this (contrasting it with python)
+was done by Gustavo Niemeyer in a
+blogpost
+a few years back.
+]]></description>
       <pubDate>Fri, 12 Sep 2014 17:10:28 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/09/12/the-four-things-i-miss-from-go.html</guid>
+      <content:encoded><![CDATA[As people who know me know, my current favourite language is
+[go](http://golang.org/). One of the best features of go is the lack of
+features. This is actually the reason I preferred C over most scripting
+languages for a long time – it does not overburden you with language-features
+that you first have to wrap your head around. You don't have to think for a
+while about what classes or modules or whatever you want to have, you just
+write your code down and the (more or less) entire language can easily fit
+inside your head. One of the best writeups of this (contrasting it with python)
+was done by Gustavo Niemeyer in a
+[blogpost](http://blog.labix.org/2012/06/26/less-is-more-and-is-not-always-straightforward)
+a few years back.
+
+So when I say, there are a few things popping up I miss about go, this does not
+mean I wish them to be included. I subjectively miss them and it would
+definitely make me happy, if they existed. But I still very much like the go
+devs for prioritizing simplicity over making me happy.
+
+So let's dig in.
+
+1. [Generics](#generics)
+2. [Weak references](#weakrefs)
+3. [Dynamic loading of go code](#dynload)
+4. [Garbage-collected goroutines](#gcgoroutines)
+
+<a name="generics"></a>
+# Generics
+
+So let's get this elephant out of the room first. I think this is the most
+named feature lacking from go. They are asked so often, they have their own
+entry in the [go FAQ](http://golang.org/doc/faq#generics). The usual answers
+are anything from "maybe they will get in" to "I don't understand why people
+want generics, go has generic programming using interfaces". To illustrate one
+shortcoming of the (current) interface approach, consider writing a (simple)
+graph-algorithm:
+
+```go
+type Graph [][]int
+
+func DFS(g Graph, start int, visitor func(int)) {
+	visited := make([]bool, len(g))
+
+	var dfs func(int)
+	dfs = func(i int) {
+		if visited[i] {
+			return
+		}
+		visitor(i)
+		visited[i] = true
+		for _, j := range g[i] {
+			dfs(j)
+		}
+	}
+
+	dfs(start)
+}
+```
+
+This uses an adjacency list to represent the graph and does a recursive
+depth-first-search on it. Now imagine, you want to implement this algorithm
+generically (given, a DFS is not really hard enough to justify this, but you
+could just as easily have a more complex algorithm). This could be done like this:
+
+```go
+type Node interface{}
+
+type Graph interface {
+	Neighbors(Node) []Node
+}
+
+func DFS(g Graph, start Node, visitor func(Node)) {
+	visited := make(map[Node]bool)
+
+	var dfs func(Node)
+	dfs = func(n Node) {
+		if visited[n] {
+			return
+		}
+		visitor(n)
+		visited[n] = true
+		for _, n2 := range g.Neighbors(n) {
+			dfs(n2)
+		}
+	}
+
+	dfs(start)
+}
+```
+
+This seems simple enough, but it has a lot of problems. For example, we loose
+type-safety: Even if we write `Neighbors(Node) []Node` there is no way to tell
+the compiler, that these instances of `Node` will actually always be the same.
+So an implementation of the graph interface would have to do type-assertions
+all over the place. Another problem is:
+
+```go
+type AdjacencyList [][]int
+
+func (l AdjacencyList) Neighbors(n Node) []Node {
+	i := n.(int)
+	var result []Node
+	for _, j := range l[i] {
+		result = append(result, j)
+	}
+	return result
+}
+```
+
+An implementation of this interface as an adjacency-list actually performs
+pretty badly, because it can not return an `[]int`, but must return a `[]Node`,
+and even though `int` satisfies `Node`, `[]int` is not assignable to `[]Node`
+(for good reasons that lie in the implementation of interfaces, but still).
+
+The way to solve this, is to always map your nodes to integers. This is what
+the standard library does in the
+[sort-package](http://golang.org/pkg/sort/#Interface). It is exactly the same
+problem. But it might not always be possible, let alone straightforward, to do
+this for Graphs, for example if they do not fit into memory (e.g. a
+web-crawler). The answer is to have the caller maintain this mapping via a
+`map[Node]int` or something similar, but… meh.
+
+<a name="weakrefs"></a>
+# Weak references
+
+I have to admit, that I am not sure, my use case here is really an important or
+even very nice one, but let's assume I want to have a database abstraction that
+transparently handles pointer-indirection. So let's say I have two tables T1
+and T2 and T2 has a foreign key referencing T1. I think it would be pretty
+neat, if a database abstraction could automatically deserialize this into a
+pointer to a T1-value `A`. But to do this. we would a) need to be able to
+recognize `A` a later Put (so if the user changes `A` and later stores it, the
+database knows what row in T1 to update) and b) hand out the *same* pointer, if
+another row in T2 references the same id.
+
+The only way I can think how to do this is to maintain a `map[Id]*T1` (or
+similar), but this would prevent the handed out values to ever be
+garbage-collected. Even though there a
+[hacks](https://groups.google.com/forum/#!topic/golang-nuts/1ItNOOj8yW8/discussion)
+that would allow some use cases for weak references to be emulated, I don't see
+how they would work here.
+
+So, as in the case of generics, this mainly means that some elegant APIs are
+not possible in go for library authors (and as I said, in this specific case it
+probably isn't a very good idea. For example you would have to think about what
+happens, if the user gets the same value in two different goroutines from the
+database).
+
+<a name="dynload"></a>
+# Dynamic loading of go code
+
+It would be useful to be able to dynamically load go code at runtime, to build
+plugins for go software. Specifically I want a good go replacement for
+[jekyll](http://jekyllrb.com/) because I went through some ruby-version-hell
+with it lately (for example `jekyll serve -w` still does not work for me with
+the version packaged in debian) and I think a statically linked go-binary would
+take a lot of possible pain-points out here. But plugins are a really important
+feature of jekyll for me, so I still want to be able to customize a page with
+plugins (how to avoid introducing the same version hell with this is another
+topic).
+
+The currently recommended ways to do plugins are a) as go-packages and
+recompiling the whole binary for every change of a plugin and b) using
+sub-processes and [net/rpc](http://golang.org/pkg/net/rpc).
+
+I don't feel a) being a good fit here, because it means maintaining a separate
+binary for every jekyll-site you have which just sounds like a smallish
+nightmare for binary distributions (plus I have use cases for plugins where even
+the relatively small compilation times of go would result in an intolerable
+increase in startup-time).
+
+b) on the other hand results in a lot of runtime-penalty: For example I can not
+really pass interfaces between plugins, let alone use channels or something and
+every function call has to have its parameters and results serialized and
+deserialized.  Where in the same process I can just define a transformation
+between different formats as a `func(r io.Reader) io.Reader` or something, in
+the RPC-context I first have to transmit the entire file over a socket, or have
+the plugin-author implement a `net/rpc` server himself and somehow pass a
+reference to it over the wire. This increases the burden on the plugin-authors
+too much, I think.
+
+Luckily, it seems there seems to be
+[some thought](https://groups.google.com/forum/#!topic/golang-dev/0_N7DLmrUFA)
+put forward recently on how to implement this, so maybe we see this in the
+nearish future.
+
+<a name="gcgoroutines"></a>
+# Garbage-collected goroutines
+
+Now, this is the only thing I really don't understand why it is not part of the
+language. Concurrency in go is a first-class citizen and garbage-collection is
+a feature emphasized all the time by the go-authors as an advantage. Yet, they
+both seem to not play entirely well together, making concurrency worse than it
+has to be.
+
+Something like the standard example of how goroutines and channels work goes a
+little bit like this:
+
+```go
+func Foo() {
+	ch := make(chan int)
+	go func() {
+		i := 0
+		for {
+			ch <- i
+			i++
+		}
+	}()
+
+	for {
+		fmt.Println(<-ch)
+	}
+}
+```
+
+Now, this is all well, but what if we want to exit the loop prematurely? We
+have to do something like this:
+
+```go
+func Foo() {
+	ch := make(chan int)
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+				case ch <- i:
+					i++
+				case <-done:
+					return
+			}
+		}
+	}()
+	for {
+		i := <-ch
+		if i > 1000 {
+			break
+		}
+		fmt.Println(i)
+	}
+}
+```
+
+Because otherwise the goroutine would just stay around for all eternity,
+effectively being leaked memory. There are
+[entire](http://youtu.be/f6kdp27TYZs) [talks](http://youtu.be/QDDwwePbDtw)
+build around this and similar problems, where I don't really understand why. If
+we add a `break` to our first version, `Foo` returns and suddenly, all other
+references to `ch`, except the one the goroutine is blocking on writing to are
+gone and can be garbage-collected. The runtime can already detect if all
+goroutines are sleeping and we have a deadlock, the garbage-collector can
+accurately see what references there are to a given channel, why can we not
+combine the two to just see "there is absolutely *no* way, this channel-write
+can *ever* succeed, so let's just kill it and gc all it's memory"? This would
+have zero impact on existing programs (because as you can not get any
+references to goroutines, a deadlocked one can have no side-effect on the rest
+of the program), but it would make channels *so* much more fun to work with. It
+would make channels as iterators a truly elegant pattern, it would simplify
+[pipelines](http://blog.golang.org/pipelines) and it would possibly allow a
+myriad other use cases for channels I can not think of right now. Heck, you
+could even think about (not sure if this is possible or desirable) running any
+deferred statements, when a goroutine is garbage-collected, so all other
+resources held by it will be correctly released.
+
+This is the *one* thing I really wish to be added to the language. Really
+diving into channels and concurrency right now is very much spoiled for me
+because I always have to think about draining every channel, always think about
+what goroutine closes what channels, passing cancellation-channels…
+]]></content:encoded>
       <dc:date>2014-09-12T17:10:28+00:00</dc:date>
     </item>
     <item>
       <title>Applying permutation in constant space (and linear time)</title>
       <link>//blog.merovius.de//2014/08/12/applying-permutation-in-constant.html</link>
-      <description>
-&lt;p&gt;permutation p, apply the permutation (in place) to the Array, using only O(1) extra space. So, if b is the array after the algorithm, we want that &lt;code&gt;a[i] == b[p[i]]&lt;/code&gt;.&lt;/p&gt;
-</description>
+      <description><![CDATA[I stumbled upon a mildly interesting problem yesterday: Given an Array a and a
+permutation p, apply the permutation (in place) to the Array, using only O(1)
+extra space.  So, if b is the array after the algorithm, we want that
+a[i] == b[p[i]].
+]]></description>
       <pubDate>Tue, 12 Aug 2014 11:10:21 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/08/12/applying-permutation-in-constant.html</guid>
+      <content:encoded><![CDATA[I stumbled upon a mildly interesting problem yesterday: Given an Array a and a
+permutation p, apply the permutation (in place) to the Array, using only O(1)
+extra space.  So, if b is the array after the algorithm, we want that
+`a[i] == b[p[i]]`.
+
+Naively, we would solve our problem by doing something like this (I'm using go
+here):
+
+```go
+func Naive(vals, perm []int) {
+	n := len(vals)
+	res := make([]int, n)
+	for i := range vals {
+		res[perm[i]] = vals[i]
+	}
+	copy(vals, res)
+}
+```
+
+This solves the problem in O(n) time, but it uses of course O(n) extra space
+for the result array. Note also, that it does not really work in place, we have
+to copy the result back.
+
+The simplest iteration of this, would be to simply use a sorting-algorithm of
+our choice, but use as a sorting key not the value of the elements, but the
+position of the corresponding field in the permutation array:
+
+```go
+import "sort"
+
+type PermSorter struct {
+	vals []int
+	perm []int
+}
+
+func (p PermSorter) Len() int {
+	return len(p.vals)
+}
+
+func (p PermSorter) Less(i, j int) bool {
+	return p.perm[i] < p.perm[j]
+}
+
+func (p PermSorter) Swap(i, j int) {
+	p.vals[i], p.vals[j] = p.vals[j], p.vals[i]
+	p.perm[i], p.perm[j] = p.perm[j], p.perm[i]
+}
+
+func Sort(vals, perm []int) {
+	sort.Sort(PermSorter{vals, perm})
+}
+```
+
+This appears a promising idea at first, but as it turns out, this doesn't
+*really* use constant space after all (at least not generally). The go sort
+package uses introsort internally, which is a combination of quick- and
+heapsort, the latter being chosen if the recursion-depth of quicksort exceeds a
+limit in O(log(n)). Thus it uses actually O(log(n)) auxiliary space. Also, the
+running time of sorting is O(n log(n)) and while time complexity wasn't part of
+the initially posed problem, it would actually nice to have linear running
+time, if possible.
+
+Note also another point: The above implementation sorts perm, thus destroying
+the permutation array. Also not part of the original problem, this might pose
+problems if we want to apply the same permutation to multiple arrays. We can
+rectify that in this case by doing the following:
+
+```go
+type NDPermSorter struct {
+	vals []int
+	perm []int
+}
+
+func (p NDPermSorter) Len() int {
+	return len(p.vals)
+}
+
+func (p NDPermSorter) Less(i, j int) bool {
+	return p.perm[p.vals[i]] < p.perm[p.vals[j]]
+}
+
+func (p NDPermSorter) Swap(i, j int) {
+	p.vals[i], p.vals[j] = p.vals[j], p.vals[i]
+}
+
+func NDSort(vals, perm []int) {
+	sort.Sort(NDPermSorter{vals, perm})
+}
+```
+
+But note, that this only works, because we want to sort an array of consecutive
+integers. In general, we don't want to do that. And I am unaware of a solution
+that doesn't have this problem (though I also didn't think about it a lot).
+
+The solution of solving this problem in linear time lies in a simple
+observation: If we start at any index and iteratively jump to the *target*
+index of the current one, we will trace out a cycle. If any index is not in the
+cycle, it will create another cycle and both cycles will be disjoint. For
+example the permutation
+
+```text
+i    0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19
+p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
+```
+
+will create the following set of cycles:
+<br>
+<a href="/assets/permutation.svg"><img src="/assets/permutation.svg" style="width:100%;margin:auto;display:block;"></a>
+
+So the idea is to resolve every cycle separately, by iterating over the indices
+and moving every element to the place it belongs:
+
+```go
+func Cycles(vals, perm []int) {
+	for i := 0; i < len(vals); i++ {
+		v, j := vals[i], perm[i]
+		for j != i {
+			vals[j], v = v, vals[j]
+			perm[j], j = j, perm[j]
+		}
+		vals[i], perm[i] = v, i
+	}
+}
+```
+
+This obviously only needs O(1) space. The secret, why it also only uses O(n)
+time lies in the fact, that the inner loop will not be entered for elements,
+that are already at the correct position. Thus this is (from a complexity
+standpoint at least) the optimal solution to the problem, as it is impossible
+to use *less* than linear time for applying a permutation.
+
+There is still one small problem with this solution: It also sorts the
+permutation array. We need this, to know when a position is already occupied by
+it's final element. In our algorithm this is represented by the fact, that the
+permutation is equal to it's index at that point. But really, it would be nice
+if we could mark the index *without* losing the order of the permutation. But
+that is not hard either - because every index is non-negative, we can
+simply negate every index we are done with. This will make a negative index out
+of it and we can check for that if we encounter it later and skip it in this
+case. After we are done, we only need to take care to flip everything back and
+all should be fine:
+
+```go
+func NDCycles(vals, perm []int) {
+	for i := 0; i < len(vals); i++ {
+		if perm[i] < 0 {
+			// already correct - unmark and go on
+			// (note that ^a is the bitwise negation
+			perm[i] = ^perm[i]
+			continue
+		}
+
+		v, j := vals[i], perm[i]
+		for j != i {
+			vals[j], v = v, vals[j]
+			// When we find this element in the future, we must not swap it any
+			// further, so we mark it here
+			perm[j], j = ^perm[j], perm[j]
+		}
+		vals[i] = v
+	}
+}
+```
+
+Here we only mark the elements we will again encounter in the *future*. The
+current index will always be unmarked, once we are done with the outer loop.
+
+I am aware, that this is technically cheating; This solution relies on the
+fact, that the upper-most bit of the permutation elements won't ever be set.
+Thus, we actually *do* have O(n) auxiliary space (as in n bit), because these
+bits are not necessary for the algorithm. However, since it is pretty unlikely,
+that we will find an architecture where this is not possible (and go guarantees
+us that it actually is, because len(vals) is *always* signed, so we cant have
+arrays that are big enough for the msb being set anyway), I think I am okay
+with it ;)
+
+I ran sum Benchmarks on this an these are the figures I came up with:
+
+<table>
+	<tr>
+		<th>n</th>
+		<td>10</td>
+		<td>100</td>
+		<td>1000</td>
+		<td>10000</td>
+	</tr>
+	<tr>
+		<th>Naive</th>
+		<td>332 ns</td>
+		<td>883 ns</td>
+		<td>15046 ns</td>
+		<td>81800 ns</td>
+	</tr>
+	<tr>
+		<th>NDCycle</th>
+		<td>130 ns</td>
+		<td>1019 ns</td>
+		<td>17978 ns</td>
+		<td>242121 ns</td>
+	</tr>
+	<tr>
+		<th>NDSort</th>
+		<td>1499 ns</td>
+		<td>27187 ns</td>
+		<td>473078 ns</td>
+		<td>4659433 ns</td>
+	</tr>
+</table>
+
+I did not measure space-use. The time of NDCycle for 10000 elements seems
+suspicious - while it is not surprising, that in general it takes more time
+than the naive approach, due to it's complexity, this jump is unexpected. Maybe
+if I have the time I will investigate this and also measure memory use. In the
+meantime, I
+[uploaded](https://gist.github.com/Merovius/9e31f4dc6a42a78c1942) all the
+code used here, so you can try it out yourself. You can run it with `go run
+perm.go` and run the benchmarks with `go test -bench Benchmark.*`.
+]]></content:encoded>
       <dc:date>2014-08-12T11:10:21+00:00</dc:date>
     </item>
     <item>
       <title>GPN14 GameJam - Crazy cat lady</title>
-      <link>//blog.merovius.de//2014/06/22/gpn14-gamejam--crazy-cat-lady.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl:dr: We made a &lt;a href=&quot;https://entropia.de/GPN14:GameJam:CrazyCatLady&quot;&gt;gamejam-game&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <link>//blog.merovius.de//2014/06/22/gpn14-gamejam-crazy-cat-lady.html</link>
+      <description><![CDATA[tl:dr: We made a gamejam-game
+]]></description>
       <pubDate>Sun, 22 Jun 2014 13:45:28 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/06/22/gpn14-gamejam-crazy-cat-lady.html</guid>
+      <content:encoded><![CDATA[**tl:dr: We made a [gamejam-game](https://entropia.de/GPN14:GameJam:CrazyCatLady)**
+
+At the GPN14 we (meaning me and Lea, with a bit of help by sECuRE) participated
+in the [gamejam](https://entropia.de/GPN14:GameJam). It was the first time for
+us both, I did all the coding and Lea provided awesome graphics.
+
+The [result](https://entropia.de/GPN14:GameJam:CrazyCatLady) is a small
+minigame “crazy cat lady”, where you throw cats at peoples faces and - if you
+hit - scratch the shit out of them (by hammering the spacebar). The game
+mechanics are kind of limited, but the graphics are just epic, in my opinion:
+
+![Screenshot]({{ site.url }}/assets/crazycatlady1.png)
+
+Because sounds make every game 342% more awesome, we added a creative commons
+licensed
+[background-music](http://freemusicarchive.org/music/fp/traces/05_fp_-_trace_5).
+We also wanted some cat-meowing and very angry pissed of hissing, which was
+more of a problem to come by. Our solution was to just wander about the GPN and
+asking random nerds to make cat sounds and recording them. That gave a pretty
+cool result, if you ask me.
+
+On the technical side we used [LÖVE](https://love2d.org/), an open 2D game
+engine for lua, widely used in gamejams. I am pretty happy with this engine,
+it took about 3 hours to get most of the game-mechanics going, the rest was
+pretty much doing the detailed animations. It is definitely not the nicest or
+most efficient code, but for a gamejam it is a well suited language and engine.
+
+If you want to try it (I don't think it is interesting for more than a few
+minutes, but definitely worth checking out), you should install LÖVE (most
+linux-distributions should have a package for that) and just
+[download](http://merovius.de/crazycatlady.love) it, or check out the
+[sourcecode](https://github.com/Merovius/crazycatlady).
+
+We did not make first place, but that is okay, the game that won is a nice game
+and a deserved winner. We had a lot of fun and we are all pretty happy with the
+result as first-timers.
+]]></content:encoded>
       <dc:date>2014-06-22T13:45:28+00:00</dc:date>
     </item>
     <item>
       <title>Python-fnord of the day</title>
       <link>//blog.merovius.de//2014/05/06/python-fnord-of-the-day.html</link>
-      <description>
-&lt;p&gt;This is an argument of believe, but I think this is highly irregular and unexpected behaviour of python:&lt;/p&gt;
-</description>
+      <description><![CDATA[This is an argument of believe, but I think this is highly irregular and
+unexpected behaviour of python:
+]]></description>
       <pubDate>Tue, 06 May 2014 01:07:28 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/05/06/python-fnord-of-the-day.html</guid>
+      <content:encoded><![CDATA[This is an argument of believe, but I think this is highly irregular and
+unexpected behaviour of python:
+
+```python
+a = [1, 2, 3, 4]
+b = a
+a = a + [5]
+print(b)
+a = [1, 2, 3, 4]
+b = a
+a += [5]
+print(b)
+```
+
+Output:
+
+```
+[1, 2, 3, 4]
+[1, 2, 3, 4, 5]
+```
+
+Call me crazy, but in my world, `x += y` should behave exactly the same as `x =
+x + y` and this is another example, why operator overloading can be abused in
+absolutely horrible ways.
+
+Never mind, that there is actually python [teaching
+material](http://www.tutorialspoint.com/python/python_basic_operators.htm) [out
+there](http://www.rafekettler.com/magicmethods.html#numeric) that teaches wrong
+things. That is, there are actually people out there who think they know python
+well enough to teach it, but don't know this. Though credit where credit is
+due, the [official documentation](https://docs.python.org/2/reference/simple_stmts.html#augmented-assignment-statements)
+mentions this behaviour.
+]]></content:encoded>
       <dc:date>2014-05-06T01:07:28+00:00</dc:date>
     </item>
     <item>
       <title>Heartbleed: New certificates</title>
       <link>//blog.merovius.de//2014/04/10/heartbleed-new-certificates.html</link>
-      <description>
-&lt;p&gt;Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my server. Since CACert appears to be mostly dead (or dying at least), I am currently on the lookout for a new CA. In the meantime I switched to self-signed certificates for all my services.&lt;/p&gt;
-</description>
+      <description><![CDATA[Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my
+server. Since CACert appears to be mostly dead (or dying at least), I am
+currently on the lookout for a new CA. In the meantime I switched to
+self-signed certificates for all my services.
+]]></description>
       <pubDate>Thu, 10 Apr 2014 21:28:25 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/04/10/heartbleed-new-certificates.html</guid>
+      <content:encoded><![CDATA[Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my
+server. Since CACert appears to be mostly dead (or dying at least), I am
+currently on the lookout for a new CA. In the meantime I switched to
+self-signed certificates for all my services.
+
+The new fingerprints are:
+<table>
+	<tr>
+		<th>Service</th>
+		<th>SHA1-Fingerprint</th>
+	</tr>
+	<tr>
+		<td>merovius.de</td>
+		<td>8C:85:B1:9E:37:92:FE:C9:71:F6:0E:C6:9B:25:9C:CD:30:2B:D5:35</td>
+	</tr>
+	<tr>
+		<td>blog.merovius.de</td>
+		<td>1B:DB:45:11:F3:EE:66:8D:3B:DF:63:B9:7C:D9:FC:26:A4:D1:E1:B8</td>
+	</tr>
+	<tr>
+		<td>git.merovius.de</td>
+		<td>65:51:16:25:1A:9E:50:B2:F7:D7:8A:2B:77:DE:DE:0C:02:3C:6C:ED</td>
+	</tr>
+	<tr>
+		<td>smtp (mail.merovius.de)</td>
+		<td>1F:E5:3F:9D:EE:B4:47:AE:2E:02:D8:2C:1E:2A:6C:FC:D6:62:99:F4</td>
+	</tr>
+	<tr>
+		<td>jabber (merovius.de)</th>
+		<td>15:64:29:49:82:0E:8B:76:47:1A:19:5B:98:6F:E4:56:24:D9:69:07</td>
+	</tr>
+</table>
+
+This is of course useless in the general case, but if you already trust my
+gpg-key, you can use
+
+```sh
+curl http://blog.merovius.de/2014/04/10/heartbleed-new-certificates.html | gpg
+```
+
+to get this post signed and verified.
+]]></content:encoded>
       <dc:date>2014-04-10T21:28:25+00:00</dc:date>
     </item>
     <item>
       <title>go stacktraces</title>
       <link>//blog.merovius.de//2014/02/19/go-stacktraces.html</link>
-      <description>
-&lt;p&gt;Let’s say you write a library in &lt;a href=&quot;http://golang.org/&quot;&gt;go&lt;/a&gt; and want an easy way to get debugging information from your users. Sure, you return &lt;code&gt;error&lt;/code&gt;s from everything, but it is sometimes hard to pinpoint where a particular error occured and what caused it. If your package &lt;code&gt;panic&lt;/code&gt;s, that will give you a stacktrace, but as you probably know you shouldn’t &lt;code&gt;panic&lt;/code&gt; in case of an error, but just gracefull recover and return the error to your caller.&lt;/p&gt;
-</description>
+      <description><![CDATA[Let&#39;s say you write a library in go and want an easy way
+to get debugging information from your users. Sure, you return errors from
+everything, but it is sometimes hard to pinpoint where a particular error
+occured and what caused it. If your package panics, that will give you a
+stacktrace, but as you probably know you shouldn&#39;t panic in case of an error,
+but just gracefull recover and return the error to your caller.
+]]></description>
       <pubDate>Wed, 19 Feb 2014 02:17:59 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/02/19/go-stacktraces.html</guid>
+      <content:encoded><![CDATA[Let's say you write a library in [go](http://golang.org/) and want an easy way
+to get debugging information from your users. Sure, you return `error`s from
+everything, but it is sometimes hard to pinpoint where a particular error
+occured and what caused it. If your package `panic`s, that will give you a
+stacktrace, but as you probably know you shouldn't `panic` in case of an error,
+but just gracefull recover and return the error to your caller.
+
+I recently discovered a pattern which I am quite happy with (for now). You can
+include a stacktrace when returning an error. If you disable this behaviour by
+default you should have as good as no impact for normal users, while making it
+much easier to debug problems. Neat.
+
+```
+package awesomelib
+
+import (
+	"os"
+	"runtime"
+)
+
+type tracedError struct {
+	err   error
+	trace string
+}
+
+var (
+	stacktrace bool
+	traceSize = 16*1024
+)
+
+func init() {
+	if os.Getenv("AWESOMELIB_ENABLE_STACKTRACE") == "true" {
+		stacktrace = true
+	}
+}
+
+func wrapErr(err error) error {
+	// If stacktraces are disabled, we return the error as is
+	if !stacktrace {
+		return err
+	}
+
+	// This is a convenience, so that we can just throw a wrapErr at every
+	// point we return an error and don't get layered useless wrappers
+	if Err, ok := err.(*tracedError); ok {
+		return Err
+	}
+
+	buf := make([]byte, traceSize)
+	n := runtime.Stack(buf, false)
+	return &tracedError{ err: err, trace: string(buf[:n]) }
+}
+
+func (err *tracedError) Error() string {
+	return fmt.Sprintf("%v\n%s", err.err, err.trace)
+}
+
+func DoFancyStuff(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return wrapErr(err)
+	}
+	// fancy stuff
+}
+```
+]]></content:encoded>
       <dc:date>2014-02-19T02:17:59+00:00</dc:date>
     </item>
     <item>
       <title>Signed blog posts</title>
       <link>//blog.merovius.de//2014/01/23/signed-blog-posts.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I sign my blogposts. curl http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I sign my blogposts. curl
+http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg
+]]></description>
       <pubDate>Thu, 23 Jan 2014 04:04:25 +0000</pubDate>
+      <guid>//blog.merovius.de//2014/01/23/signed-blog-posts.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I sign my blogposts. curl
+http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg**
+
+I might have to update my TLS server certificate soon, because the last change
+seems to have broken the verification of https://merovius.de/. This is nothing
+too exciting, but it occured to me that I should actually provide some warning
+or notice in that case, so that people can be sure, that there is nothing
+wrong. The easiest way to accomplish this would be a blogpost and the easiest
+way to verify that the statements in that blogpost are correct would be, to
+provide a signed version. So because of this (and, well, because I can) I
+decided to sign all my blogposts with my gpg-key. People who know me should
+have my gpg key so they can verify that I really have written everything I
+claim.
+
+I could have used
+[jekyll-gpg_clearsign](https://github.com/kormoc/jekyll-gpg_clearsign), but it
+does not really do the right thing in my opinion. It wraps all the HTML in a
+GPG SIGNED MESSAGE block and attaches a signature. This has the advantage of
+minimum overhead - you only add the signature itself plus some constant
+comments of overhead. However, it makes really verifying the contents of a
+blogpost pretty tedious: You would have to either manually parse the HTML in
+your mind, or you would have to save it to disk and view it in your browser,
+because you cannot be sure, that the HTML you get when verifying it via curl on
+the commandline is the same you get in your browser. You could write a
+browser-extension or something similar that looks for these blocks, but still,
+the content could be tempered with (for example: Add the correctly signed page
+as a comment in a tampered with page. Or try to somehow include some javascript
+that changes the text after verifying…). Also, the generated HTML is not really
+what I want to sign; after all I can not really attest that the HTML-generation
+is really solid and trustworthy, I never read the jekyll source-code and I
+don't want to, at every update. What I really want to sign is the stuff I wrote
+myself, the markdown (or whatever) I put into the post. This has the additional
+advantage, that most markdown is easily parseable by humans, so you can
+actually have your gpg output the signed text and immediately read everything I
+wrote.
+
+So this is, what happens now. In every blogpost there is a HTML-comment
+embedded, containing the original markdown I wrote for this post in compressed,
+signed and ASCII-armored form. You can try it via
+
+	curl http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg
+
+This should output some markdown to stdout and a synopsis of gpg about a valid
+(possibly untrusted, if you don't have my gpg-key) signature on stderr. Neat!
+
+The [changes](http://git.merovius.de/blog/commit/?id=dd005159f9fb25ebc8ef789608a609bcb65fc62c)
+needed in the blog-code itself where pretty minimal. I had however (since I
+don't want my gpg secret key to be on the server) to change the deployment a
+little bit. Where before a git push would trigger a hook on the remote
+repository on my server that ran jekyll, now I have a local script, that wraps
+a jekyll build, an rsync to the webserver-directory and a git push. gpg-agent
+ensures, that I am not asked for a passphrase too often.
+
+So, yeah. Crypto is cool. And the procrastinator prevailed again!
+]]></content:encoded>
       <dc:date>2014-01-23T04:04:25+00:00</dc:date>
     </item>
     <item>
       <title>Incentives in education</title>
       <link>//blog.merovius.de//2013/12/16/incentives-in-education.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I hate software-engineering as it is teached in Heidelberg. Really&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I hate software-engineering as it is teached in Heidelberg. Really
+]]></description>
       <pubDate>Mon, 16 Dec 2013 01:32:47 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/12/16/incentives-in-education.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I hate software-engineering as it is teached in Heidelberg. Really**
+
+I often recited the story of how I got to choose computer science over physics
+as a minor in my mathematics bachelor:
+
+After sitting through almost one semester of the introductory course to
+theoretical physics in my 3rd semester — which is incredibly unsatisfactory
+and boring, once you are past your first year of mathematics — I suddenly
+realized that my reward for suffering through yet another problem sheet of
+calculating yet another set of differential operators is, that I have to suffer
+through four or five more of these type of courses. This really seemed like a
+poor incentive, when I was just discovering hacking and that I was really good
+at computer science. So I decided to pass on the opportunity, did not work all
+night on that last sheet (and later found out that I would have gotten credit
+for that course without even taking the written exam if I just handed in this
+additional problem sheet) and instead decided to minor in computer science.
+
+Three years after that I decided to get a second bachelor degree in computer
+science (I finished my bachelor of mathematics earlier that year and was
+pursuing my master degree at that point), because it seemed a really easy thing
+to do at that point: I only needed two semesters more of studies and a bachelor
+thesis. That is not a lot of work for a degree. We are now one year and some
+change after that point, and there really is not a lot I need anymore.
+Basically I only need to finish the introduction to software engineering and
+then write my thesis. Yay for me.
+
+The reason I write this (and the reason I started with the anecdote of
+physics) is that once again I am questioning the incentives versus the cost.
+Since I am pretty sure that it would actually be fun to write my thesis, it all
+boils down to the question, whether I want to finish this course (which again,
+I'm more than halfway done with, it is not a lot work to go) to get a bachelor
+degree in computer science. And don't get me wrong — I'm sure that software
+engineering is a topic, that can be interesting and captivating, or at the
+minimum bearable. But the way it is done here in Heidelberg is just hell. It is
+incredibly boringly presented and consists of a flood of uninteresting
+repetitive tasks and the project-work, to show how important teamwork and
+quality-assurance and drawing a **lot** of diagrams is, is a catastrophically
+bad, unusable and ugly piece of crapware, that can't even decently perform the
+very simple task it was designed to (managing a private movie collection. I
+mean, come on, it is not exactly rocket science to do this in at least a barely
+usable way).
+
+And even though it is a hell that I would only have to endure for about two or
+three problem sheets and one written exam, I watch myself putting off the work
+on it (for example by writing this stupid blogpost) and I seriously question
+whether this second bachelor is really incentive enough to suffer through it.
+
+If it was my first degree, that would of course be a clear ”yes“. But a second
+one? Not sure. Ironically the main way I'm putting of work on this problem
+sheet — I got up today at 10am, to immediately and energetically start to work
+on it — is watching I lot of TED talks on youtube. That's right, I practically
+spent 14 hours more or less non-stop watching TED talks. This one applies to
+some extend — extrinsic incentives can only go this far in making us do some
+work; at some point, without at least some intrinsic motivation, I at least
+will not perform very well (or at all):
+
+<p style="text-align: center;">
+<iframe width="560" height="315" src="//www.youtube-nocookie.com/embed/rrkrvAUbU9Y" frameborder="0" allowfullscreen></iframe>
+</p>
+]]></content:encoded>
       <dc:date>2013-12-16T01:32:47+00:00</dc:date>
     </item>
     <item>
       <title>ext4: Mysterious “No space left on device”-errors</title>
       <link>//blog.merovius.de//2013/10/20/ext4-mysterious-no-space-left-on.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: ext4 has a feature called &lt;code&gt;dir_index&lt;/code&gt; enabled by default, which is quite susceptible to hash-collisions&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: ext4 has a feature called dir_index enabled by default, which is
+quite susceptible to hash-collisions
+]]></description>
       <pubDate>Sun, 20 Oct 2013 21:13:07 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/10/20/ext4-mysterious-no-space-left-on.html</guid>
+      <content:encoded><![CDATA[**tl;dr: ext4 has a feature called `dir_index` enabled by default, which is
+quite susceptible to hash-collisions**
+
+I am currently restructuring my mail-setup. Currently, I use offlineimap to
+sync my separate accounts to a series of maildirs on my server. I then use sup
+on the server as a MUA. I want to switch to a local setup with notmuch, so I
+set up an dovecot imapd on my server and have all my accounts forward to my
+primary address. I then want to use offlineimap to have my mails in a local
+maildir, which I browse with notmuch.
+
+I then stumbled about a curious problem: When trying to copy my mails from my
+server to my local harddisk, it would fail after about 50K E-mails with the
+message “could not create xyz: no space left on device” (actually, offlineimap
+would just hog all my CPUs and freeze my whole machine in the process, but
+that's a different story). But there actually was plenty of space left.
+
+It took me and a few friends a whole while to discover the problem. So if you
+ever get this error message (using ext4) you should probably check these four
+things (my issue was the last one):
+
+# Do you *actually* have enough space?
+
+Use `df -h`. There is actually a very common pitfall with ext4. Let's have a look:
+
+```
+mero@rincewind ~$ df -h
+Filesystem              Size  Used Avail Use% Mounted on
+/dev/mapper/sda2_crypt  235G  164G   69G  71% /
+...
+```
+
+If you add 164G and 69G, you get 233G, which is 2G short of the actual size.
+This is about 1%, but on your system it will likely be more of 5% difference.
+The reason is the distinction between "free" and "available" space. Per default
+on ext4, there are about 5% of "reserved" blocks. This has two reasons: First
+ext4's performance seems to take a small hit, when almost full. Secondly, it
+leaves a little space for root to login and troubleshoot problems or delete
+some files, when users filled their home-directory. If there was *no* space
+left, it might well be, that no login is possible anymore (because of the
+creation of temporary files, logfiles, history-files…). So use `tune2fs
+<path_to_your_disk>` to see, if you have reserved blocks, and how many of them:
+
+```
+mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep "Reserved block"
+Reserved block count:     2499541
+Reserved blocks uid:      0 (user root)
+Reserved blocks gid:      0 (group root)
+```
+
+# Do you have too many files?
+
+Even though you might have enough space left, it might well be, that you have
+too many files. ext4 allows an enormous amount of files on any file system, but
+it is limited. Checking this is easy: Just use `df -i`:
+
+```
+Filesystem               Inodes  IUsed    IFree IUse% Mounted on
+/dev/mapper/sda2_crypt 15622144 925993 14696151    6% /
+...
+```
+
+So as you see, that wasn't the problem with me. But if you ever have the `IUse%`
+column near 100, you probably want to delete some old files (and you should
+*definitely* question, how so many files could be created to begin with).
+
+# Do a file system check
+
+At least some people on the internet say, that something like this has
+happened to them after a crash (coincidentally my system crashed before the
+problem arose. See above comments about offlineimap) and that a file system
+check got rid of it. So you probably want to run `fsck -f <path_to_your_disk>`
+to run such a check. You probably also want to do that from a live-system, if
+you cannot unmount it (for example if it's mounted at the root-dir).
+
+# Do you have `dir_index` enabled?
+
+So this is the punch line: ext4 has the possibility to hash the filenames of
+its contents. This enhances performance, but has a “small” problem: ext4 does
+not grow its hashtable, when it starts to fill up. Instead it returns -ENOSPC
+or “no space left on device”.
+
+ext4 uses `half_md4` as a default hashing-mechanism. If I interpret my
+google-results correctly, this uses the md4-hash algorithm, but strips it to 32
+bits. This is a classical example of the
+[birthday-paradox](http://en.wikipedia.org/wiki/Birthday_problem): A 32 bit
+hash means, that there are 4294967296 different hash values available, so if we
+are fair and assume a uniform distribution of hash values, that makes it highly
+unlikely to hit one specific hash. But the probability of hitting two identical
+hashes, given enough filenames, is much much higher. Using the
+[formula](http://en.wikipedia.org/wiki/Birthday_problem#Cast_as_a_collision_problem)
+from Wikipedia we get (with about 50K files) a probability of about 25% that a
+newly added file has the same hash. This is a huge probability of failure. If
+on the other hand we take a 64bit hash-function the probability becomes much
+smaller, about 0.00000000007%.
+
+So if you have a lot of files in the same directory, you probably want to switch
+off `dir_index`, or at least change to a different hash-algorithm. You can
+check if you have `dir_index` enabled and change the hash, like this:
+
+```
+mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
+dir_index
+
+# Change the hash-algo to a bigger one
+mero@rincewind ~$ sudo tune2fs -E "hash_alg=tea" /dev/mapper/sda2_crypt
+# Disable it completely
+mero@rincewind ~$ sudo tune2fs -O "^dir_index"
+```
+
+Note however, that `dir_index` and `half_md4` where choices made for
+performance reasons. So you might experience a performance-hit after this.
+
+**UPDATE:** After trying it out, I realized, that the problem actually also
+persists with the tea-hash. I then had a look at [the
+ext4-documentation](https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout#Hash_Tree_Directories)
+about the topic and it seems, that the hash is only stored as 32 bits, so it
+actually does not matter what hash we choose, regarding this particular
+problem. So if `half_md4` is chosen [because of its better performance and
+collision-resistance](http://git.whamcloud.com/?p=tools/e2fsprogs.git;a=commitdiff_plain;h=d1070d91b4de8438dc78c034283baaa19b31d25e)
+it actually makes sense to leave it as the default. You can by the way easily
+test and reproduce the issue by using the following on an ext4 file system:
+
+```
+for a in `seq 100000`
+do
+        file=`head -c 51 /dev/urandom | base64 | tr '/' '_'`
+        touch $file
+done
+```
+
+Curiously, this only gives me about 160 collisions on 100K files (instead of
+about 10K collisions on 60K files), which would suggest, that my original
+sample (meaning my mailbox) exhibits some properties that make collisions more
+likely both on `half_md4` *and* `tea`.
+]]></content:encoded>
       <dc:date>2013-10-20T21:13:07+00:00</dc:date>
     </item>
     <item>
       <title>Using i3 and vim to keep a set of notes at hand</title>
       <link>//blog.merovius.de//2013/10/20/using-i3-and-vim-to-keep-a-set-o.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: Put a terminal with a vim-instance in an i3-scratchpad, combine it with autosave-when-idle and you got the perfect note keeping workflow&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: Put a terminal with a vim-instance in an i3-scratchpad, combine it
+with autosave-when-idle and you got the perfect note keeping workflow
+]]></description>
       <pubDate>Sun, 20 Oct 2013 03:45:52 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/10/20/using-i3-and-vim-to-keep-a-set-o.html</guid>
+      <content:encoded><![CDATA[**tl;dr: Put a terminal with a vim-instance in an i3-scratchpad, combine it
+with autosave-when-idle and you got the perfect note keeping workflow**
+
+There are often occasions where I want to write something down, while not
+wanting to disturb my thought-process too much or taking too much of an effort.
+An example for the former would be a short TODO I suddenly remember while doing
+something more important. As an example for the latter, I keep an "account" for
+drinks at our local computer club, so that I don't always have to put single
+coins into the register, but can just put 20€ or something in and don't have to
+worry about it for a while. Combining the
+[scratchpad-window](http://i3wm.org/docs/userguide.html#_scratchpad) feature of
+i3 with a little vim-magic makes this effortless enough to be actually
+preferable to just paying.
+
+First of, you should map a key to `scratchpad show` in i3, for example I have
+the following in my config:
+
+```
+bind Mod4+Shift+21 move scratchpad
+bind Mod4+21 scratchpad show
+```
+
+I can then just use `Mod4+<backtic>` to access the scratchpad.
+
+Now, just put a terminal in scratchpad-mode and open .notes in vim in this
+terminal. By pressing the `scratchpad show` binding repeatedly, you can send it
+to the background and bring it to the foreground again.
+
+I have my current "balance" in this notes-file and during the meetings of the
+computer club leave the cursor on this balance. If I take a drink, I press `^X`
+decreasing my balance by one (every drink is one Euro). If I pay, say 10 Euros
+into the register, I press `10^A` increasing my balance by 10.
+
+This is already much better, but it still has one problem: I better save that
+file every time I change my balance, else a crash would screw up my accounting.
+Luckily, vim provides autocommands and has an event for "the user did not type
+for a while". This means, that we can automatically save the file if we idled
+for a few seconds, for example if we send the scratchpad window away. For this,
+we put the following in our `.vimrc`:
+
+```
+" Automatically save the file notes when idle
+autocmd CursorHold .notes :write
+```
+
+Now adjusting my balance is just a matter of a very short key sequence:
+``<mod4>`<c-x><mod4>` ``
+]]></content:encoded>
       <dc:date>2013-10-20T03:45:52+00:00</dc:date>
     </item>
     <item>
       <title>Tic Tac Toe AI</title>
       <link>//blog.merovius.de//2013/10/19/tic-tac-toe-ai.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I wrote a simple Tic Tac Toe AI as an exercise. You can get it on &lt;a href=&quot;https://github.com/Merovius/tictactoe&quot;&gt;github&lt;/a&gt;&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I wrote a simple Tic Tac Toe AI as an exercise. You can get it on
+github
+]]></description>
       <pubDate>Sat, 19 Oct 2013 01:58:04 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/10/19/tic-tac-toe-ai.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I wrote a simple Tic Tac Toe AI as an exercise. You can get it on
+[github](https://github.com/Merovius/tictactoe)**
+
+I am currently considering writing a basic chess AI as an exercise in AI
+development and to help me analyze my own games (and hopefully get a better
+chess-player just by thinking about how a machine would do it). As a small
+exercise and to get some familiarity with the algorithms involved, I started
+with [Tic Tac Toe](https://en.wikipedia.org/wiki/Tic_tac_toe). Because of the
+limited number of games (only [255168](http://www.se16.info/hgb/tictactoe.htm))
+all positions can be bruteforced very fast, which makes it an excellent
+exercise, because even with a very simple
+[Minimax-Algorithm](https://en.wikipedia.org/wiki/Minimax#Minimax_algorithm_with_alternate_moves)
+perfect play is possible.
+
+[My AI](https://github.com/Merovius/tictactoe) uses exactly this algorithm (if
+coded a little crude). It comes with a little TUI and a small testsuite, you
+can try it like this:
+
+```sh
+$ git clone git://github.com/Merovius/tictactoe.git
+$ cd tictactoe
+$ make
+$ make test
+$ ./tictactoe
+```
+
+You will notice, that there already is no noticable delay (at least not on a
+relatively modern machine), even though the AI is unoptimized and bruteforces
+the whole tree of possible moves on every move.
+
+Next I will first refactor the basic algorithm in use now, then I will probably
+implement better techniques, such as limited search-depth,
+[αβ-Pruning](https://en.wikipedia.org/wiki/Alpha-beta_pruning) or machine
+learning. I will then think about moving on to a little more complex games (for
+example Connect 4, Mill or Hex seem good choices). Then I will decide how big
+the effort would be for chess and if it's worth a try.
+]]></content:encoded>
       <dc:date>2013-10-19T01:58:04+00:00</dc:date>
     </item>
     <item>
       <title>Inject Environment variables into running processes</title>
       <link>//blog.merovius.de//2013/10/11/inject-environment-variables-int.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: Using gdb to manipulate a running process is fun and just the right amount of danger to be exiting&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: Using gdb to manipulate a running process is fun and just the right
+amount of danger to be exiting
+]]></description>
       <pubDate>Fri, 11 Oct 2013 03:25:09 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/10/11/inject-environment-variables-int.html</guid>
+      <content:encoded><![CDATA[**tl;dr: Using gdb to manipulate a running process is fun and just the right
+amount of danger to be exiting**
+
+Just to document this (a friend asked me): If you ever wanted for example to
+globally change your `$PATH`, or add a global `$LD_PRELOAD` (for example to use
+[insulterr](https://github.com/Merovius/insulterr) ;) ), without restarting
+your session, gdb is your friend.
+
+You can call arbitrary functions in the context of any process (that you are
+priviledged to attach a debugger, it has to run under your uid or you have to
+be root, see `ptrace(2)` for specifics), as long as they are linked. Almost
+everything is linked to `libld`, so with enough effort this actually means
+*every* function.
+
+For example, suppose you are running [i3wm](http://i3wm.org) and want to add
+`/home/user/insulterr/insulterr.so` to your `$LD_PRELOAD` in every process
+started by i3:
+
+```
+$ gdb -p `pidof i3` `which i3`
+<lots of output of gdb>
+gdb $ call setenv("LD_PRELOAD", "/home/user/insulterr/insulterr.so")
+gdb $ quit
+A debugging session is active.
+
+	Inferior 1 [process 2] will be detached.
+
+Quit anyway? (y or n) y
+Detaching from program: /usr/bin/i3, process 2
+```
+
+This is of course a terrible hack, by high standards. Things to look out for
+are (off the top of my head):
+
+* You call a function that manipulates `errno` or does some other non-reentrent
+  things. If you are attaching the debugger right in the middle of a library
+  call (or immediately after) this *might* make the program unhappy because it
+  does not detect an error (or falsely thinks there is an error).
+* You call a function that does not work in a multithreaded context and another
+  thread modifies it at the same time. Bad.
+* You interrupt a badly checked `read(2)`/`write(2)`/`whatever(…)` call and a
+  badly written program doesn't realize it got less data then expected (and/or
+  crashes).  Shouldn't happen in practice, if it does, file a bug.
+* You try to use symbols that are not available. This is actually not very bad
+  and can be worked around (a friend of mine had the problem of needing `false`
+  and just substituted 0).
+* You use a daemon (like `urxvtd(1)`) for your terminals and the environment
+  does not get passed correctly. This is also not very bad, just confusing.
+  Attach your debugger to the daemon and change the environment there too.
+* You attach the debugger to some process vital to the interaction with your
+  debugger. Your window manager is a mild example. The terminal daemon is
+  slightly worse (because, well, you can't actually type in the terminal window
+  that your debugger is running in, ergo you can't stop it…), but you can
+  change to a virtual terminal. Something like getty or init might be killing
+  it.
+
+Have fun!
+]]></content:encoded>
       <dc:date>2013-10-11T03:25:09+00:00</dc:date>
     </item>
     <item>
       <title>How to C-Golf</title>
       <link>//blog.merovius.de//2013/10/11/how-to-cgolf.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: We had a codegolf challenge recently. My C-solution was 246 byte, the perl-winner was 191. I decided to give notes for C-golf beginners&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: We had a codegolf challenge recently. My C-solution was 246 byte, the
+perl-winner was 191. I decided to give notes for C-golf beginners
+]]></description>
       <pubDate>Fri, 11 Oct 2013 02:09:38 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/10/11/how-to-cgolf.html</guid>
+      <content:encoded><![CDATA[**tl;dr: We had a codegolf challenge recently. My C-solution was 246 byte, the
+perl-winner was 191. I decided to give notes for C-golf beginners**
+
+**Note:** Most of this blog post is incredibly boring. A better way than to
+read through it is to just skip through the git-repository and refer to the
+explanations here everytime you don't know why a change works or what it
+does. To make this easier, I added ankers to every paragraph, named by the
+commit of the change it explains. So if you want to know, how a specific change
+works, you can add `#commitid` to the url of this post, with `commitid` being
+the full id of that change. If you want to read the more interesting
+stuff, [from about here](#4272ca2a181e8f50c1645b793c7a1338f9ff1502) it starts
+to get non-obvious I think.
+
+At the [rgb2rv10](http://rgb2r.noname-ev.de/) we again had a
+[codegolf](https://en.wikipedia.org/wiki/Code_golf) event. C is generally not a
+preferred language for golf, but I use it, because I know it best and my
+experiences with it are not that bad. My C solutions are most of the times
+longer then the shortest solutions in perl or similar languages, but they are
+competitive. That's why I decided to make a blogpost explaining this years C
+solution as an example to show some basic C-golfing techniques.
+
+This years [challenge](https://www.noname-ev.de/w/Codegolf/RGB2Rv10) was to
+implement an interpreter for esocalc, a two-dimensional language for arithmetic
+expressions. Follow the link for a more detailed specification. This challenge
+is primed to be solved in C. This is also reflected by the length of the
+different solutions: The shortest C solution is 246 bytes, the shortest Python
+solution is 227 and the shortest Perl solution is 191 bytes. For a
+codegolf-challenge this is an impressively small gap between C and scripting
+languages.
+
+You can follow this post by checking out [the code](https://github.com/Merovius/cgolf)
+on github. The oldest commit is the one we are starting with and we will refine
+it until we reach the 246 byte solution in `master`. You can test it by
+compiling it (`gcc -o golf golf.c` should suffice in most cases, the shortest
+needs a longer commandline, which is put in the Makefile, so you should `make`
+it). You can run it through the testsuite used in the contest by running
+`GOLF_BIN="./golf prove -l"`.
+
+<a name="e3dc46c7c88f740c6b4eb671cd3b987061797529"></a>
+The first step is to implement an easily readable, working version. This is
+done in the
+[first commit](https://github.com/Merovius/cgolf/blob/e3dc46c7c88f740c6b4eb671cd3b987061797529/golf.c).
+Though you yourself might have come up with a different implementation, this is
+pretty straightforward I think. We just read the whole esocalc-sourcecode and
+walk through it, executing every instruction as we go. The stack is statically
+allocated and of a fixed size, but that's no problem because we only have a
+limited testsuite anyway.
+
+<a name="38e6ffceb633615f48d0a9d25a391abf5228c35c"></a>
+The [next step](https://github.com/Merovius/cgolf/blob/38e6ffceb633615f48d0a9d25a391abf5228c35c/golf.c)
+is obvious: We remove comments and move to one-letter variable names, thus
+reducing readability, but also size considerably. We will leave most of the
+whitespace for now, because else it is hard to follow the changes.
+
+<a name="004b45da976b3d1aab23e1b5ed3b9ff87b002895"></a>
+An important lesson for C-golfers is the following: *for is never longer then
+while and most of the times shorter*. An endless loop with `while` takes one
+character more then a `for`-loop. We will later see more instances when `for` will
+be considerably shorter. Also, we see the `if`/`else`-constructs in the
+control-flow instructions. It is considerably shorter to use a ternary operator
+in most cases, because in C, most statements are also expressions, so we can
+write them as cases in `?:` - or use the short-circuiting `&&` if there is no
+`else`-part. We will see more of that later. Lastly we collapse multiple
+variable declarations into one to save `int`-keywords. These three changes are
+what happend in [the next version](https://github.com/Merovius/cgolf/blob/004b45da976b3d1aab23e1b5ed3b9ff87b002895/golf.c).
+
+<a name="eb5227716869399d62f12dcfc07c7e42094782b7"></a>
+We continue in our path and notice, that we every `char`-literal takes three
+bytes, while the number it represents often only takes two in decimal.
+[Let's fix that](https://github.com/Merovius/cgolf/blob/eb5227716869399d62f12dcfc07c7e42094782b7/golf.c).
+
+<a name="75625a730875ded009a216887db5455b5105e7e6"></a>
+We also have two temporary variables `a` and `b`, that we shouldn't need.
+[We can get rid of them](https://github.com/Merovius/cgolf/blob/75625a730875ded009a216887db5455b5105e7e6/golf.c),
+by thinking up a single statement for arithmetic operations.
+
+<a name="f0af3799d6c5ee3c30a1f43dd5c89523f2619759"></a>
+[The next step](https://github.com/Merovius/cgolf/blob/f0af3799d6c5ee3c30a1f43dd5c89523f2619759/golf.c)
+uses a real detail of C: If you don't give a type for a global variable, a
+parameter or the return type of a function, `int` is assumed. If a function is
+not defined, a prototype of `int foo()` is assumed, meaning we can pass
+arbitrary arguments and get an `int`. The libc is linked in by default. All
+these facts means, we can drop all `include`s and put our variables in the
+global scope to remove all `int`-keywords. This is a very basic, but very
+usefull technique. It has one important caveat, you should look out for: If you
+need the return value of a libc-function and it is *not* `int`, you should
+think about wether it can be safely converted. For example on amd64 an `int`
+has 32 bits, but a pointer has 64 bits, therefore pointers as return values get
+truncated (even if you assign them to a pointer).
+
+<a name="17f305a0091651c03bb9e86e6ee9332f72138c04"></a>
+[We can save more](https://github.com/Merovius/cgolf/blob/17f305a0091651c03bb9e86e6ee9332f72138c04/golf.c)
+by using a parameter to `main`. This is also a very basic and often seen trick
+in C-golfing. You get up to 3 local variables for free this way. In our case
+there is an additional benefit: The first parameter to `main` is the number of
+arguments, which is 1 for a normal call (the first argument is the name with
+which the programm was called). This means, we get the initialization to 1 for
+free.
+
+<a name="f3957253031431ec25f8d4f68c10ca1b4dcfd4ed"></a>
+[A trivial optimization](https://github.com/Merovius/cgolf/blob/f3957253031431ec25f8d4f68c10ca1b4dcfd4ed/golf.c)
+is using `gets` instead of `read`. `gets` always adds a terminating zero-byte,
+so we need to grow our buffer a little bit.
+
+<a name="https://github.com/Merovius/cgolf/blob/fed1a817b88072dc5d27d8ae4dc772da8518ee5d"></a>
+If we now look at our code, all the `case`-keywords might annoy us. If we see
+a lot of repititions in our code, the obvious tool to use in C are `define`s. So
+[lets define](https://github.com/Merovius/cgolf/blob/fed1a817b88072dc5d27d8ae4dc772da8518ee5d/golf.c)
+the structure of the cases and replace every case by a short 1-letter identifier.
+
+<a name="9de0b6f05fc52e5c08829bcf6d60a83c6756fba2"></a>
+The same goes for the arithmetic operations: Four times the same long code cries
+for a [define](https://github.com/Merovius/cgolf/blob/9de0b6f05fc52e5c08829bcf6d60a83c6756fba2/golf.c).
+A `define` is not always a good solution. You have to weigh the additional
+overhead of the keyword and the needed newline against the savings and number
+of repititions.
+
+<a name="ec654b1a11012a7820807cd29fe65a6427f300d4"></a>
+[Next](https://github.com/Merovius/cgolf/blob/ec654b1a11012a7820807cd29fe65a6427f300d4/golf.c)
+we eliminate the variable `i`. Skilled C-coders use pointer-arithmetic quite
+often (no matter how bad the reputation is). In this case it would be a bad
+idea, if we were not explicitely allowed to assume that all programs are
+correct and stay in the bounds given (because bound-checks are a lot harder
+without indexing).
+
+<a name="6a10cb1480e1ca6cdc61bd628d8cb2f4d365a699"></a>
+Another example of savings by `for`-loops is
+[the next change](https://github.com/Merovius/cgolf/blob/6a10cb1480e1ca6cdc61bd628d8cb2f4d365a699/golf.c).
+Here we moved two statements into the `for`-loop, thus using the semicolons we
+need there anyway and saving two bytes.
+
+<a name="7d506e18324daf3d6d98e25682321c19c7bef781"></a>
+So the next big thing that catches our eyes are the `switch`, `case` and
+`break`-keywords. Everytime you see long identifiers or keywords you should
+think about wether a different program-structure or a different libc-builtin
+may help you save it. `switch`-construct can almost always be replaced by an
+`if`-`else if` construct (which is why we learned to use `switch` anyway). This
+is often shorter, but as we learned, the ternary operator is even shorter. So in
+[the next step](https://github.com/Merovius/cgolf/blob/7d506e18324daf3d6d98e25682321c19c7bef781/golf.c)
+we use a giant ternary expression instead of a `switch`-structure. This brings
+one major problem: `return` is one of the few things that's a statement, but
+not an expression. So we can't use it in `?:`-expressions (because the branches
+have to be expressions). We use `exit()` instead, which is an expression, but a
+`void`-expression, so again we run into problems using it in `?:`. We work
+around that for now by using `(exit(0),1)` instead. If you connect expressions
+by `,` they are evaluated in succession (contrary to using boolean operators
+for example) and the value of the last one is becoming the value of the whole
+expression - so our `exit`-expression evaluates to 1 in this case.
+
+<a name="4272ca2a181e8f50c1645b793c7a1338f9ff1502"></a>
+`exit` is still pretty long (especially with the added parens and
+comma-expression), so we want to avoid it too. Here comes a notable quote of
+the organisator of the competition into action: “The return value isn't
+important, as long as the output is correct. So it doesn't matter if you
+segfault or anything”. This is the key to
+[the next change](https://github.com/Merovius/cgolf/blob/4272ca2a181e8f50c1645b793c7a1338f9ff1502/golf.c):
+Instead of exiting orderly we just create the conditions for a segfault by
+assigning zero to `p`, which is dereferenced shortly thereafter, thus creating
+a segfault when we want to exit. This is one of my favourite optimizations.
+
+<a name="bb1b73fdfd4be6a75ebc47046af7b9af06ff80fe"></a>
+There still is some repitition in our code. We still assign to `d` more often
+then not. But our big nested ternary operator doesn't return anything yet. So our
+[next step](https://github.com/Merovius/cgolf/blob/bb1b73fdfd4be6a75ebc47046af7b9af06ff80fe/golf.c)
+is to return the new value for `d` in all subexpressions (if need be by using a
+comma). This does not save a lot, but still a few bytes.
+
+<a name="309465a985f67a8326ab10347b568ef467362b1c"></a>
+Now the sources of bytes to save are getting scarcer. What still is a pain is
+the explicit stack of a fixed size. Here another deep mistery of C (or more
+specifically the way modern computers work)  comes into play:
+[The call stack](https://en.wikipedia.org/wiki/Call_stack). We can actually
+[use this as our stack](https://github.com/Merovius/cgolf/blob/309465a985f67a8326ab10347b568ef467362b1c/golf.c).
+The way this works is, that we use a pointer to an address in the memory area,
+the operating system reserved for our call stack and grow down (contrary to the
+illustration on wikipedia, the stack grows downwards. But this is a minor
+detail). By writing to this pointer and decrementing, we can push to the stack.
+By incrementing it and reading we can pop something from the top of the stack.
+To get a valid stack-address we could use the address of a local variable (for
+example `s` itself). Local variables are at the bottom of the stackframe, so we
+do not overwrite anything important if growing down. There is however a
+problem: We call `gets` and `printf` which push a few stackframes to the
+callstack. Our stack would get smashed by these calls. Therefore we just
+subtract a sufficiently high number from it to reserve space for the
+stackframes of the function calls. 760 is the minimum amount needed in my
+setup, everything up to 99999 should save at least one byte.
+
+<a name="00afa97fb52ba275f638092118b49b4027261928"></a>
+This still is unsatisfactory, so we will hack a little more and use the fact,
+that the testsuite only uses quite small programms and a quite small stack is
+needed. So we just
+[use `s` unitialized](https://github.com/Merovius/cgolf/blob/00afa97fb52ba275f638092118b49b4027261928/golf.c),
+which is absolutely crazy. I discovered (by accident), that you will always end
+up with a pointer to your program-array, using around 200 bytes of the end
+(most probably some earlier deeply nested call in the startup of the binary
+will write an appropriate address here by accident). This of course is
+borderline cheating, but it saves 6 bytes, so who cares. From now on it's
+absolutely forbidden to compile with optimizations, because this will destroy
+this coincidence. Oh well.
+
+<a name="e2aafeb23a88abb731d0341610bc84acd285424d"></a>
+So, if we are already doing unreliable horrific voodoo which will curl up the
+fingernails of every honest C developer, we can also
+[save two bytes](https://github.com/Merovius/cgolf/blob/e2aafeb23a88abb731d0341610bc84acd285424d/golf.c)
+by not setting `p` to zero, but instead just doubling it. You will then end up
+with *some* address, that is hard to predict, but in all cases I tried leads to
+crashing just as reliable. This means, we exit our program in just one byte. Neato!
+
+<a name="7b1803ce9fe52c0f57fb804067493bc975dfb3be"></a>
+There is not a lot we can save left now. What might still annoy us and is a
+very good tip in general are all this numbers. Even if most characters have
+only 2 bytes as a decimal, they still only have one byte as a character (not a
+`char`-literal!). We can
+[fix this](https://github.com/Merovius/cgolf/blob/7b1803ce9fe52c0f57fb804067493bc975dfb3be/golf.c)
+by passing a verbatim character as the first argument to the `c`-makro. To
+interpret it as a `char`, we stringify it (with `#a`) and dereference it (with
+`*#a`), getting the first `char`. This opens a problem: A space is a
+significant character in the interpreted source code, so we need to use it as
+an argument. But a space is not significant at that point in the C source code,
+so we simply can not pass it to our makro. The solution to this is to move the
+whole ASCII-table. So instead of comparing `*p` we compare `*p+n` with `n` to
+be choosen. Thus we don't need to pass a space, but some other char, that is
+`n` positions away and everyone is happy. Kind of. We also need to avoid single
+quotes, double quotes (though we can avoid this by using emtpy string (think
+about why this works), but too many bytes!!!), parenthesis and chars outside of
+ASCII (because this will break our C-file). These constrictions make `n=3`
+pretty much the only choice. This means, we have to include a DEL-character in
+our source-code, but the compiler is quite happy about that (the wiki isn't,
+github isn't, the editor isn't, but who cares). This is my second most favourite hack.
+
+<a name="60a5912baccb94e3e31cc57fe09712b1e7cb0280"></a><a name="70da40d21ca8ff3a58e5d2a3a890ff0f44d2ee0c"></a>
+Now there is not much left to do. We
+[remove the last char-literal left](https://github.com/Merovius/cgolf/blob/60a5912baccb94e3e31cc57fe09712b1e7cb0280/golf.c) and
+[remove all non-essential whitespace](https://github.com/Merovius/cgolf/blob/70da40d21ca8ff3a58e5d2a3a890ff0f44d2ee0c/golf.c).
+
+<a name="09ff6c236827639aad31edec198e97748241c3ea"></a>
+This leaves us with 253 bytes. To get below 250, we
+[use buildflags](https://github.com/Merovius/cgolf/blob/09ff6c236827639aad31edec198e97748241c3ea/Makefile)
+instead of
+[defines](https://github.com/Merovius/cgolf/blob/09ff6c236827639aad31edec198e97748241c3ea/golf.c).
+Usually such flags are counted by the difference they add to a minimal compiler
+call needed. In this case, we have a 186 byte C-file (after removing the
+trailing newline added by vim) and 60 bytes of compiler-flags, totalling 246
+bytes.
+
+I think there still is potential to remove some more characters. Other tools
+not used here include
+[dispatch tables](https://en.wikipedia.org/wiki/Dispatch_table)
+(which are kind of hard in C, because it lacks an eval, but some variations of
+the concept still apply) and magic formulas. If the testcases are very limited,
+some people resort to hardcoding the wanted results and just golf a minimal way
+to differentiate between what output is wanted. This might be surprising, but
+in many cases (this included) this will end up being shorter (though I consider
+it cheating and try to avoid it). We also didn't do a lot of
+[bit banging](https://en.wikipedia.org/wiki/Bit_banging). For example using `^`
+instead of `==` reverses the check but saves a byte. But I think it is a
+usefull intro for people who are just learning C and want to dive deeper into
+the language by golfing.
+]]></content:encoded>
       <dc:date>2013-10-11T02:09:38+00:00</dc:date>
     </item>
     <item>
       <title>New PGP Key</title>
       <link>//blog.merovius.de//2013/10/03/new-pgp-key.html</link>
-      <description>
-&lt;p&gt;Because I recently applied for the position of a Debian maintainer, I finally had to upgrade my PGP Key to a more secure 4096 bit RSA. The new fingerprint is&lt;/p&gt;
-</description>
+      <description><![CDATA[Because I recently applied for the position of a Debian maintainer, I
+finally had to upgrade my PGP Key to a more secure 4096 bit RSA. The
+new fingerprint is
+]]></description>
       <pubDate>Thu, 03 Oct 2013 00:44:00 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/10/03/new-pgp-key.html</guid>
+      <content:encoded><![CDATA[Because I recently applied for the position of a Debian maintainer, I
+finally had to upgrade my PGP Key to a more secure 4096 bit RSA. The
+new fingerprint is
+
+    AF03 1CB8 DFFB 7DC5 E1EE  EB04 A7C9 FF06 3F3D 2E03
+
+I signed the new key with my old key and [uploaded it to the
+keyservers](http://pgp.mit.edu/pks/lookup?op=vindex&search=0xA7C9FF063F3D2E03).
+My old key will be valid for a little longer, so you can still send me
+encrypted Mails using my old key, but I would ask you to transition as
+fast as possible to the new one. If the signature with my old key is
+enough to earn your trust, you can delete the old key and set the new
+one to trusted (and maybe even sign it again and mail me the signed
+key or upload it), else you can check the fingerprint in person when
+we meet next time.
+]]></content:encoded>
       <dc:date>2013-10-03T00:44:00+00:00</dc:date>
     </item>
     <item>
       <title>Lazy blogging with jekyll</title>
       <link>//blog.merovius.de//2013/09/28/lazy-blogging-with-jekyll.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I put up a &lt;a href=&quot;https://gist.github.com/Merovius/6736709&quot;&gt;small script&lt;/a&gt; to automate creating blog-posts in jekyll&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I put up a small script to
+automate creating blog-posts in jekyll
+]]></description>
       <pubDate>Sat, 28 Sep 2013 15:11:10 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/09/28/lazy-blogging-with-jekyll.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I put up a [small script](https://gist.github.com/Merovius/6736709) to
+automate creating blog-posts in jekyll**
+
+If you think about setting up your own blog, jekyll seems to be an appropriate
+choice. This short guide should put you through the process of having an easy
+setup for writing and deploying your blog via your favourite editor (vim) and
+your favourite version control system (git) to a publicly available server via
+ssh.
+
+First thing you will need, is to have jekyll installed on both machines (the
+ones where you will write your posts and the one where you will deploy them to).
+Because the debian-version appears to be horribly outdated, I installed it via
+gem. As far as I understood, this has the advantage of making an installation
+without root-privileges possible. You should also have git available on both
+machines.
+
+Initializing your blog is pretty easy, `jekyll new mynewblog` (on your local
+machine) should suffice.  You still want to do some configuration and
+customization, most of which should be straight-forward. Edit the `index.html`,
+the `_config.yml` and the `_layouts/default.html`. You might also want to have
+an Atom-template, so people can subscribe to your blog in their favourite
+RSS-reader. My good friend Stefan [helped with
+that](https://git.yrden.de/?p=blog.git/.git;a=blob;f=atom.xml;hb=HEAD) just put
+that file into the root of your blog-directory, edit your blogtitle and
+everything into it and add the line
+{% highlight html %}
+<link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+{% endhighlight %}
+in the `<head>` section of `_layouts/default.html`.
+
+Next thing is setting up deployment. Just `git init` a blog, `git add` every
+configuration file, page, template and whatnot and `git commit` it. ssh onto
+your deployment-machine and do a `git init --bare blog.git`. Save the following
+file to `blog.git/hooks/post-update` and change the path to point to a
+directory, that is served by your http-server:
+{% gist 6736709 post-update %}
+Everytime you push into `blog.git` you will then have jekyll automatically
+rebuild your blog. You now only have to do the following on your local machine
+to deploy your blog:
+
+```sh
+git remote add origin username@example.com:blog.git
+git push --set-upstream origin master
+```
+
+Now to the really fancy stuff. Jekyll expects your blogposts to live under the
+`_posts`-directory under a special filename-format and to have a YAML-preamble,
+containing some configuration. It can be quite cumbersome to manage this
+yourself, so I wrote a [shellscript](https://gist.github.com/Merovius/6736709)
+to ease the process. Put it anywhere in your path (i chose the name `newpost`)
+and make it executable.
+
+When you run the script, it will look into the current directory for a
+jekyll-blog and create a draft from a small template given in the script. It
+will then optionally run a jekyll-development server, so that you can preview
+your blog-post in your browser (by saving the draft) and open the draft in your
+favourite editor. After you close your editor, the jekyll server will be
+stopped and the draft will be saved under `_posts/YYYY-MM-DD-abbrev-title.fmt`,
+where `YYYY-MM-DD` is the current date (date and time will also be automatically
+added to the YAML-preamble), `fmt` is a configurable format (markdown is default)
+and `abbrev-title` is a short string derived from the title you put in.
+
+There will also (optionally) be a git-commit created with a default
+commit-message. You can edit the message in an editor and abort the commit, by
+deleting everything and saving an empty commit-message. If you really want
+(though I would not advise it) you can also automatically push it, after you're
+done.
+
+After this setup, to create a new blogpost, you just have to `cd` to your
+blog-repository, run `newpost`, type your blogpost (and add a title), preview it
+in your browsers, exit your editor and you have everything ready to push. It
+can't get much easier.
+]]></content:encoded>
       <dc:date>2013-09-28T15:11:10+00:00</dc:date>
     </item>
     <item>
       <title>First-year introductory course for programming</title>
       <link>//blog.merovius.de//2013/09/28/firstyear-introductory-course-fo.html</link>
-      <description>
-&lt;p&gt;&lt;strong&gt;tl;dr: I gave a very introductory programming course and saw once again how the basic ideas underlying the modernization of teaching &lt;em&gt;just work&lt;/em&gt; when implemented right.&lt;/strong&gt;&lt;/p&gt;
-</description>
+      <description><![CDATA[tl;dr: I gave a very introductory programming course and saw once again how
+the basic ideas underlying the modernization of teaching just work when
+implemented right.
+]]></description>
       <pubDate>Sat, 28 Sep 2013 03:16:52 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/09/28/firstyear-introductory-course-fo.html</guid>
+      <content:encoded><![CDATA[**tl;dr: I gave a very introductory programming course and saw once again how
+the basic ideas underlying the modernization of teaching *just work* when
+implemented right.**
+
+This last week I organized a (very basic) introductory course on programming for
+our first-year students. I was set on C++ because it is the language used in the
+introductory lecture and we wanted to give people with absolutely no background
+in programming or proper use of a computer the necessary tools to start in this
+lecture on mostly equal grounds to people who already took a basic computer
+science course in school. We had five days, with 3 hours a day to try to reach
+that goal, which is a very limited amount of time for such a course and we had
+50 participants.
+
+The whole concept of the course was very modern (at least for our universities
+standards) - instead of just giving lectures, telling people about syntax and
+stuff we divided up the whole course into 19 lessons, each of which was worked
+at mostly independent. That had two big advantages (and was very positively
+perceived): First, the amount of time, we needed to spend lecturing and doing
+frontal presentations was minimized to about half an hour over all the course.
+The saved time could be invested in individual tutoring. This enabled us to
+react to every student needing help in a few seconds, using only about 3-4
+senior students (with mostly pretty minimal background themselves actually) to
+teach.
+
+Second the students where able to just work in their own speed without external
+pressure or a limit on the time spent on any lesson. Missing deadlines for
+lessons meant more experimentation, less competition amongst the students, less
+stress and less pressure to finish with all lessons in time. The course was not
+designed to be finished, so even though many students didn't reach the last
+lesson, I think the additional experimentation (combined with a less
+content-driven curriculum) added much more value for the students.
+
+The content also was rather different from what you usually read in tutorials or
+get in lectures at the university. Instead of systematically developing syntax
+and different language constructs, we used the language less then the object to
+learn, but the mean to learn basic skills needed, when tackling a programming
+lecture (basically: „How do I start“ and „what can I do, if it doesn't work?“).
+We introduced every lesson with about a page of text, describing the key
+constructs underlying the object of that lesson, gave some basic code-examples
+and (without explaining the details of the syntax) then presented some basic
+exercises, which could be mastered without much understanding of what was
+happening, but which ensured the reproduction needed, to properly learn the
+syntactic device or the idea. We then added some playfull, very open exercises,
+where through experimentation and through their own mistakes the students where
+supposed to discover themselves the more intricate details of the subject
+matter. Thematically we restricted the syntax to the absolute minimum to get
+some basic, but fun and usefull programms to work (for example, we introduced
+only one kind of loop, and we introduced only the datatypes int, bool,
+std::string and double, as well as arrays thereof)
+
+Though this all might sound fairly „new-agey“, it worked remarkably well. We saw
+a fair amount of experimentation, we saw very creative solutions to seemingly
+easy and straightforward, we got very positive feedback and though we introduced
+many special subjects (for example debuggers, online references and detailed
+lectures and exercises on how to read manpages or error output of the compiler),
+I think it is fair to say, that we reached at least the level of proficiency and
+confidence as the more traditional courses we held the last years had.
+
+So, the bottomline is: We took a very huge bite out of the ideas and thoughts
+underlying the ongoing effort in europe to modernize teaching at universities
+(The „Bologna Process“, as it's known at least here in germany) and though I
+totally agree, that the implementation of these guidelines at the universities
+is currently pretty misguided and plain *bad*, I once again feel confirmed in my
+view, that if you put some effort into it and really use what the underlying
+ideas of bologna are (instead of just picking up, what you hear from the media
+about it), you can create a really kick-ass curriculum, that is both more fun
+*and* more informative at the same time.
+
+All used content is on
+[github](https://github.com/FachschaftMathPhys/Infovorkurs), if you are
+interested in what exactly we used in the course.
+]]></content:encoded>
       <dc:date>2013-09-28T03:16:52+00:00</dc:date>
     </item>
     <item>
       <title>Relaunch</title>
       <link>//blog.merovius.de//2013/09/28/relaunch.html</link>
-      <description>
-&lt;p&gt;Years ago I took down my blog because I was so unsatisfied with wordpress. In these years I started about 5 times to write my own git-based blog-engine and about 5 times I stopped after making considerable progress (mostly because it was too hard to integrate comments). This time the urge to restart my blog is finally overpowering my chronic nii-syndrome and I decided to use &lt;a href=&quot;http://jekyllrb.com/&quot;&gt;jekyll&lt;/a&gt; as a blog-engine and add some git-hook-magic myself.&lt;/p&gt;
-</description>
+      <description><![CDATA[Years ago I took down my blog because I was so unsatisfied with
+wordpress. In these years I started about 5 times to write my own
+git-based blog-engine and about 5 times I stopped after making
+considerable progress (mostly because it was too hard to integrate
+comments). This time the urge to restart my blog is finally
+overpowering my chronic nii-syndrome and I decided to use
+jekyll as a blog-engine and add some git-hook-magic myself.
+]]></description>
       <pubDate>Sat, 28 Sep 2013 02:08:05 +0000</pubDate>
+      <guid>//blog.merovius.de//2013/09/28/relaunch.html</guid>
+      <content:encoded><![CDATA[Years ago I took down my blog because I was so unsatisfied with
+wordpress. In these years I started about 5 times to write my own
+git-based blog-engine and about 5 times I stopped after making
+considerable progress (mostly because it was too hard to integrate
+comments). This time the urge to restart my blog is finally
+overpowering my chronic nii-syndrome and I decided to use
+[jekyll](http://jekyllrb.com/) as a blog-engine and add some git-hook-magic myself.
+
+The layout is still pretty shitty, it's the default of jekyll, but I
+wanted to put it online before seing my efforts die again on such
+minor details.
+
+So this is finally the relaunch of my blog. Yay for me.
+]]></content:encoded>
       <dc:date>2013-09-28T02:08:05+00:00</dc:date>
     </item>
     <dc:date>2017-06-18T22:57:21+00:00</dc:date>

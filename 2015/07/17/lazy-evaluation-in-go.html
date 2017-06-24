@@ -28,7 +28,7 @@
 evaluation</a>. Haskell is famous
 for making extensive use of it. One way to emulate goroutine-safe lazy
 evaluation is using closures and <a href="https://godoc.org/sync">the sync-package</a>:</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">LazyInt</span> <span class="kd">func</span><span class="p">()</span> <span class="kt">int</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">LazyInt</span> <span class="kd">func</span><span class="p">()</span> <span class="kt">int</span>
 
 <span class="kd">func</span> <span class="nx">Make</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">()</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">LazyInt</span> <span class="p">{</span>
     <span class="kd">var</span> <span class="nx">v</span> <span class="kt">int</span>
@@ -56,7 +56,7 @@ the same idea) for different
 <a href="https://godoc.org/merovius.de/go-misc/lazy">types</a>.</p>
 
 <p>This is of course just the simplest use-case for lazynes. In practice, you might also want Implementations of Expressions</p>
-<div class="highlight"><pre><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nx">LazyAdd</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">LazyInt</span><span class="p">)</span> <span class="nx">LazyInt</span> <span class="p">{</span>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">LazyAdd</span><span class="p">(</span><span class="nx">a</span><span class="p">,</span> <span class="nx">b</span> <span class="nx">LazyInt</span><span class="p">)</span> <span class="nx">LazyInt</span> <span class="p">{</span>
     <span class="k">return</span> <span class="nx">Make</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">a</span><span class="p">()</span> <span class="o">+</span> <span class="nx">b</span><span class="p">()</span> <span class="p">})</span>
 <span class="p">}</span>
 </code></pre></div>

@@ -45,7 +45,7 @@ things (my issue was the last one):</p>
 <h1>Do you <em>actually</em> have enough space?</h1>
 
 <p>Use <code>df -h</code>. There is actually a very common pitfall with ext4. Let&#39;s have a look:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">mero@rincewind ~$ df -h
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>mero@rincewind ~$ df -h
 Filesystem              Size  Used Avail Use% Mounted on
 /dev/mapper/sda2_crypt  235G  164G   69G  71% /
 ...
@@ -60,7 +60,7 @@ some files, when users filled their home-directory. If there was <em>no</em> spa
 left, it might well be, that no login is possible anymore (because of the
 creation of temporary files, logfiles, history-files…). So use <code>tune2fs
 &lt;path_to_your_disk&gt;</code> to see, if you have reserved blocks, and how many of them:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep &quot;Reserved block&quot;
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep &quot;Reserved block&quot;
 Reserved block count:     2499541
 Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
@@ -70,7 +70,7 @@ Reserved blocks gid:      0 (group root)
 <p>Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
 it is limited. Checking this is easy: Just use <code>df -i</code>:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">Filesystem               Inodes  IUsed    IFree IUse% Mounted on
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>Filesystem               Inodes  IUsed    IFree IUse% Mounted on
 /dev/mapper/sda2_crypt 15622144 925993 14696151    6% /
 ...
 </code></pre></div>
@@ -111,7 +111,7 @@ smaller, about 0.00000000007%.</p>
 <p>So if you have a lot of files in the same directory, you probably want to switch
 off <code>dir_index</code>, or at least change to a different hash-algorithm. You can
 check if you have <code>dir_index</code> enabled and change the hash, like this:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
 dir_index
 
 # Change the hash-algo to a bigger one
@@ -131,7 +131,7 @@ problem. So if <code>half_md4</code> is chosen <a href="http://git.whamcloud.com
 collision-resistance</a>
 it actually makes sense to leave it as the default. You can by the way easily
 test and reproduce the issue by using the following on an ext4 file system:</p>
-<div class="highlight"><pre><code class="language-text" data-lang="text">for a in `seq 100000`
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>for a in `seq 100000`
 do
         file=`head -c 51 /dev/urandom | base64 | tr &#39;/&#39; &#39;_&#39;`
         touch $file
