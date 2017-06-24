@@ -152,7 +152,7 @@ type App struct {
 
 func (h *App) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var head string
-	head, req.URL.String = ShiftPath(req.URL.String)
+	head, req.URL.Path = ShiftPath(req.URL.Path)
 	if head == "user" {
 		h.UserHandler.ServeHTTP(res, req)
 		return
@@ -165,7 +165,7 @@ type UserHandler struct {
 
 func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var head string
-	head, req.URL.String = ShiftPath(req.URL.String)
+	head, req.URL.Path = ShiftPath(req.URL.Path)
 	id, err := strconv.Atoi(head)
 	if err != nil {
 		http.Error(res, fmt.Sprintf("Invalid user id %q", head), http.StatusBadRequest)
@@ -207,15 +207,15 @@ type UserHandler struct{
 
 func (h *UserHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var head string
-	head, req.URL.String = ShiftPath(req.URL.String)
+	head, req.URL.Path = ShiftPath(req.URL.Path)
 	id, err := strconv.Atoi(head)
 	if err != nil {
 		http.Error(res, fmt.Sprintf("Invalid user id %q", head), http.StatusBadRequest)
 		return
 	}
 
-	if req.URL.String != "/" {
-		head, tail := ShiftPath(req.URL.String)
+	if req.URL.Path != "/" {
+		head, tail := ShiftPath(req.URL.Path)
 		switch head {
 		case "profile":
 			// We can't just make ProfileHandler an http.Handler; it needs the
