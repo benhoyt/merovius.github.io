@@ -3,9 +3,14 @@ url: //blog.merovius.de/
 
 markdown: redcarpet
 highlighter: pygments
+gems: ['jekyll-gist']
 
 encoding: UTF-8
 
 sitemap:
     url: https://blog.merovius.de
-    exclude: [ 'atom.xml', 'impressum.html', 'google59e5fe5f31947a20.html', 'robots.txt' ]
+    exclude:
+        - 'atom.xml'
+        - 'impressum.html'
+        - 'google59e5fe5f31947a20.html'
+        - 'robots.txt'

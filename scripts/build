@@ -1,5 +1,8 @@
 #!/bin/bash
 
+[ -z "${IMAGE}" ] && IMAGE="merovius/jekyll:$(date +'%Y-%m')-$(./scripts/ha.sh)"
+echo "Using ${IMAGE}"
+
 OUT=$(mktemp -d)
 [ -z "$OUT" ] && exit 1
 
@@ -14,6 +17,6 @@ sudo docker run -i -t \
 				--tmpfs /tmp \
 				-v $OUT:/tmp/out:Z \
 				-w /src/jekyll \
-				merovius/jekyll \
+				${IMAGE} \
 				/bin/bash -c "jekyll build --destination /tmp/_site && tar czf /tmp/out/site.tar.gz -C /tmp/_site ."
 mv $OUT/site.tar.gz .
