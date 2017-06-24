@@ -6,4 +6,4 @@
 	url = https://github.com/Merovius/sitemap_generator
 [submodule "jekyll-rss"]
 	path = jekyll/_plugins/jekyll-rss
-	url = https://github.com/agelber/jekyll-rss.git
+	url = https://github.com/Merovius/jekyll-rss.git
