@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="http://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="//blog.merovius.de//atom.xml"/>
-  <updated>2017-06-24T17:34:05+00:00</updated>
+  <updated>2017-07-03T23:02:29+00:00</updated>
   <id>//blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -41,7 +41,7 @@ frustrated by it. In this post I want to explain why routers &lt;em&gt;in genera
 including &lt;code&gt;http.ServeMux&lt;/code&gt; - should be avoided and what I consider simple,
 maintainable and scalable routing using nothing but the stdlib.&lt;/p&gt;
 
-&lt;h2&gt;But why?&lt;/h2&gt;
+&lt;h4&gt;But why?&lt;/h4&gt;
 
 &lt;p&gt;&lt;img src=&quot;https://i.giphy.com/1M9fmo1WAFVK0.webp&quot; alt=&quot;But why?&quot;&gt;&lt;/p&gt;
 
@@ -114,7 +114,7 @@ packages needed in the whole application) and it becomes unmaintainable after a
 while. You can alleviate that by delegating to subrouters though; which really
 is the basis of how I prefer to do all of this these days.&lt;/p&gt;
 
-&lt;h2&gt;How to use the stdlib to route&lt;/h2&gt;
+&lt;h4&gt;How to use the stdlib to route&lt;/h4&gt;
 
 &lt;p&gt;Let&amp;#39;s build the toy example from &lt;a href=&quot;https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6&quot;&gt;this medium post&lt;/a&gt;.
 It&amp;#39;s not terribly complicated but it serves nicely to illustrate the general
@@ -261,7 +261,7 @@ coupling. But that&amp;#39;s not true. Its &lt;code&gt;UserHandler&lt;/code&gt; 
 of your choice (flags, dependency injection,…) and gets wired up in &lt;code&gt;main&lt;/code&gt;. All
 &lt;code&gt;App&lt;/code&gt; needs to know is the API of the handlers it&amp;#39;s &lt;em&gt;directly&lt;/em&gt; invoking.&lt;/p&gt;
 
-&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
 
 &lt;p&gt;I hope I convinced you that routers &lt;em&gt;in and off itself&lt;/em&gt; are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
@@ -495,7 +495,7 @@ talk about in a meaningful way and must be dealt with separately anyway.
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:&lt;/p&gt;
 
-&lt;h1&gt;Adding func/type/var/const at package scope&lt;/h1&gt;
+&lt;h4&gt;Adding func/type/var/const at package scope&lt;/h4&gt;
 
 &lt;p&gt;This is the only thing that seems to be fine under the stability guarantee.  It
 turns out the go authors thought about this one and put the exception of
@@ -513,23 +513,23 @@ to use a separate &lt;code&gt;foo_test&lt;/code&gt; package for your tests to br
 In that case it is widely deemed acceptable to &lt;code&gt;. import &amp;quot;foo&amp;quot;&lt;/code&gt; to save typing
 and add clarity.&lt;/p&gt;
 
-&lt;h1&gt;Removing func/type/var/const at package scope&lt;/h1&gt;
+&lt;h4&gt;Removing func/type/var/const at package scope&lt;/h4&gt;
 
 &lt;p&gt;Downstream might use the removed function/type/variable/constant, so this is
 obviously a breaking change.&lt;/p&gt;
 
-&lt;h1&gt;Adding a method to an interface&lt;/h1&gt;
+&lt;h4&gt;Adding a method to an interface&lt;/h4&gt;
 
 &lt;p&gt;Downstream might want to create an implementation of your interface and try to
 pass it. After you add a method, this type doesn&amp;#39;t implement your interface
 anymore and downstreams code will break.&lt;/p&gt;
 
-&lt;h1&gt;Removing a method from an interface&lt;/h1&gt;
+&lt;h4&gt;Removing a method from an interface&lt;/h4&gt;
 
 &lt;p&gt;Downstream might want to call this method on a value of your interface type, so
 this is obviously a breaking change.&lt;/p&gt;
 
-&lt;h1&gt;Adding a field to a struct&lt;/h1&gt;
+&lt;h4&gt;Adding a field to a struct&lt;/h4&gt;
 
 &lt;p&gt;This is perhaps surprising, but adding a field to a struct is a breaking
 change. The reason is, that downstream might embed two types into a struct. If
@@ -585,20 +585,20 @@ to write the selector and wrap every embedded method anyway.&lt;/p&gt;
 &lt;p&gt;I hope we all agree that type embedding is awesome and shouldn&amp;#39;t need to be
 avoided :)&lt;/p&gt;
 
-&lt;h1&gt;Removing a field from a struct&lt;/h1&gt;
+&lt;h4&gt;Removing a field from a struct&lt;/h4&gt;
 
 &lt;p&gt;Downstream might use the now removed field, so this is obviously a breaking change.&lt;/p&gt;
 
-&lt;h1&gt;Adding a method to a type&lt;/h1&gt;
+&lt;h4&gt;Adding a method to a type&lt;/h4&gt;
 
 &lt;p&gt;The argument is pretty much the same as adding a field to a struct: Downstream
 might embed your type and suddenly get ambiguities.&lt;/p&gt;
 
-&lt;h1&gt;Removing a method from a type&lt;/h1&gt;
+&lt;h4&gt;Removing a method from a type&lt;/h4&gt;
 
 &lt;p&gt;Downstream might call the now removed method, so this is obviously a breaking change.&lt;/p&gt;
 
-&lt;h1&gt;Changing a function/method signature&lt;/h1&gt;
+&lt;h4&gt;Changing a function/method signature&lt;/h4&gt;
 
 &lt;p&gt;Most changes are obviously breaking. But as it turns out you can&amp;#39;t do &lt;em&gt;any&lt;/em&gt;
 change to a function or method signature. This includes adding a variadic
@@ -608,7 +608,7 @@ call site will still be correct, right?&lt;/p&gt;
 &lt;p&gt;The reason is, that downstream might save your function or method in a variable
 of the old type, which will break because of nonassignable types.&lt;/p&gt;
 
-&lt;h1&gt;Conclusion&lt;/h1&gt;
+&lt;h4&gt;Conclusion&lt;/h4&gt;
 
 &lt;p&gt;It looks to me like anything that isn&amp;#39;t just adding a new Identifier to the
 package-scope will potentially break &lt;em&gt;some&lt;/em&gt; downstream. This severely limits
@@ -690,7 +690,7 @@ quite big API even bigger) :)&lt;/p&gt;
   <entry>
     <id>//blog.merovius.de//2015/04/13/difficulties-making-sql-based-au</id>
     <link type="text/html" rel="alternate" href="//blog.merovius.de//2015/04/13/difficulties-making-sql-based-au.html"/>
-    <title>Difficulties making SQL based authentication resilient against timing attacks</title>
+    <title>SQL authentication timing side-channels</title>
     <updated>2015-04-13T02:49:53+00:00</updated>
     <content type="html">&lt;p&gt;I&amp;#39;ve been thinking about how to do an authentication scheme, that uses some
 kind of relational database (it doesn&amp;#39;t matter specifically, that the database
@@ -799,7 +799,7 @@ devs for prioritizing simplicity over making me happy.&lt;/p&gt;
 
 &lt;p&gt;&lt;a name=&quot;generics&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h1&gt;Generics&lt;/h1&gt;
+&lt;h4&gt;Generics&lt;/h4&gt;
 
 &lt;p&gt;So let&amp;#39;s get this elephant out of the room first. I think this is the most
 named feature lacking from go. They are asked so often, they have their own
@@ -887,7 +887,7 @@ web-crawler). The answer is to have the caller maintain this mapping via a
 
 &lt;p&gt;&lt;a name=&quot;weakrefs&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h1&gt;Weak references&lt;/h1&gt;
+&lt;h4&gt;Weak references&lt;/h4&gt;
 
 &lt;p&gt;I have to admit, that I am not sure, my use case here is really an important or
 even very nice one, but let&amp;#39;s assume I want to have a database abstraction that
@@ -914,7 +914,7 @@ database).&lt;/p&gt;
 
 &lt;p&gt;&lt;a name=&quot;dynload&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h1&gt;Dynamic loading of go code&lt;/h1&gt;
+&lt;h4&gt;Dynamic loading of go code&lt;/h4&gt;
 
 &lt;p&gt;It would be useful to be able to dynamically load go code at runtime, to build
 plugins for go software. Specifically I want a good go replacement for
@@ -953,7 +953,7 @@ nearish future.&lt;/p&gt;
 
 &lt;p&gt;&lt;a name=&quot;gcgoroutines&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h1&gt;Garbage-collected goroutines&lt;/h1&gt;
+&lt;h4&gt;Garbage-collected goroutines&lt;/h4&gt;
 
 &lt;p&gt;Now, this is the only thing I really don&amp;#39;t understand why it is not part of the
 language. Concurrency in go is a first-class citizen and garbage-collection is
@@ -1130,8 +1130,7 @@ example the permutation&lt;/p&gt;
 p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;will create the following set of cycles:
-&lt;br&gt;
-&lt;a href=&quot;/assets/permutation.svg&quot;&gt;&lt;img src=&quot;/assets/permutation.svg&quot; style=&quot;width:100%;margin:auto;display:block;&quot;&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;a href=&quot;/assets/permutation.svg&quot;&gt;&lt;img src=&quot;/assets/permutation.svg&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
 &lt;p&gt;So the idea is to resolve every cycle separately, by iterating over the indices
 and moving every element to the place it belongs:&lt;/p&gt;
@@ -1196,35 +1195,42 @@ with it ;)&lt;/p&gt;
 
 &lt;p&gt;I ran sum Benchmarks on this an these are the figures I came up with:&lt;/p&gt;
 
-&lt;table&gt;
-    &lt;tr&gt;
-        &lt;th&gt;n&lt;/th&gt;
-        &lt;td&gt;10&lt;/td&gt;
-        &lt;td&gt;100&lt;/td&gt;
-        &lt;td&gt;1000&lt;/td&gt;
-        &lt;td&gt;10000&lt;/td&gt;
-    &lt;/tr&gt;
-    &lt;tr&gt;
-        &lt;th&gt;Naive&lt;/th&gt;
-        &lt;td&gt;332 ns&lt;/td&gt;
-        &lt;td&gt;883 ns&lt;/td&gt;
-        &lt;td&gt;15046 ns&lt;/td&gt;
-        &lt;td&gt;81800 ns&lt;/td&gt;
-    &lt;/tr&gt;
-    &lt;tr&gt;
-        &lt;th&gt;NDCycle&lt;/th&gt;
-        &lt;td&gt;130 ns&lt;/td&gt;
-        &lt;td&gt;1019 ns&lt;/td&gt;
-        &lt;td&gt;17978 ns&lt;/td&gt;
-        &lt;td&gt;242121 ns&lt;/td&gt;
-    &lt;/tr&gt;
-    &lt;tr&gt;
-        &lt;th&gt;NDSort&lt;/th&gt;
-        &lt;td&gt;1499 ns&lt;/td&gt;
-        &lt;td&gt;27187 ns&lt;/td&gt;
-        &lt;td&gt;473078 ns&lt;/td&gt;
-        &lt;td&gt;4659433 ns&lt;/td&gt;
-    &lt;/tr&gt;
+&lt;table class=&quot;highlight&quot;&gt;
+    &lt;thead&gt;
+        &lt;tr&gt;
+            &lt;th&gt;n&lt;/th&gt;
+            &lt;th&gt;Naive&lt;/th&gt;
+            &lt;th&gt;NDCycle&lt;/th&gt;
+            &lt;th&gt;NDSort&lt;/th&gt;
+        &lt;/tr&gt;
+    &lt;/thead&gt;
+
+    &lt;tbody&gt;
+        &lt;tr&gt;
+            &lt;td&gt;10&lt;/td&gt;
+            &lt;td&gt;332 ns&lt;/td&gt;
+            &lt;td&gt;130 ns&lt;/td&gt;
+            &lt;td&gt;1499 ns&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;100&lt;/td&gt;
+            &lt;td&gt;883 ns&lt;/td&gt;
+            &lt;td&gt;1019 ns&lt;/td&gt;
+            &lt;td&gt;27187 ns&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;1000&lt;/td&gt;
+            &lt;td&gt;15046 ns&lt;/td&gt;
+            &lt;td&gt;17978 ns&lt;/td&gt;
+            &lt;td&gt;473078 ns&lt;/td&gt;
+        &lt;/tr&gt;
+        &lt;tr&gt;
+            &lt;td&gt;10000&lt;/td&gt;
+            &lt;td&gt;81800 ns&lt;/td&gt;
+            &lt;td&gt;242121 ns&lt;/td&gt;
+            &lt;td&gt;4659433 ns&lt;/td&gt;
+        &lt;/tr&gt;
+    &lt;/tbody&gt;
 &lt;/table&gt;
 
 &lt;p&gt;I did not measure space-use. The time of NDCycle for 10000 elements seems
@@ -1437,7 +1443,7 @@ func DoFancyStuff(path string) error {
     <link type="text/html" rel="alternate" href="//blog.merovius.de//2014/01/23/signed-blog-posts.html"/>
     <title>Signed blog posts</title>
     <updated>2014-01-23T04:04:25+00:00</updated>
-    <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: I sign my blogposts. curl
+    <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: I sign my blog posts. curl
 http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;I might have to update my TLS server certificate soon, because the last change
@@ -1554,9 +1560,9 @@ some extend — extrinsic incentives can only go this far in making us do some
 work; at some point, without at least some intrinsic motivation, I at least
 will not perform very well (or at all):&lt;/p&gt;
 
-&lt;p style=&quot;text-align: center;&quot;&gt;
-&lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;//www.youtube-nocookie.com/embed/rrkrvAUbU9Y&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;
-&lt;/p&gt;
+&lt;div class=&quot;video-container&quot;&gt;
+  &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;//www.youtube-nocookie.com/embed/rrkrvAUbU9Y&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;
+&lt;/div&gt;
 </content>
   </entry>
   
@@ -1585,7 +1591,7 @@ that&amp;#39;s a different story). But there actually was plenty of space left.&
 ever get this error message (using ext4) you should probably check these four
 things (my issue was the last one):&lt;/p&gt;
 
-&lt;h1&gt;Do you &lt;em&gt;actually&lt;/em&gt; have enough space?&lt;/h1&gt;
+&lt;h4&gt;Do you &lt;em&gt;actually&lt;/em&gt; have enough space?&lt;/h4&gt;
 
 &lt;p&gt;Use &lt;code&gt;df -h&lt;/code&gt;. There is actually a very common pitfall with ext4. Let&amp;#39;s have a look:&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;&lt;span&gt;&lt;/span&gt;mero@rincewind ~$ df -h
@@ -1608,7 +1614,7 @@ Reserved block count:     2499541
 Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h1&gt;Do you have too many files?&lt;/h1&gt;
+&lt;h4&gt;Do you have too many files?&lt;/h4&gt;
 
 &lt;p&gt;Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
@@ -1621,7 +1627,7 @@ it is limited. Checking this is easy: Just use &lt;code&gt;df -i&lt;/code&gt;:&l
 column near 100, you probably want to delete some old files (and you should
 &lt;em&gt;definitely&lt;/em&gt; question, how so many files could be created to begin with).&lt;/p&gt;
 
-&lt;h1&gt;Do a file system check&lt;/h1&gt;
+&lt;h4&gt;Do a file system check&lt;/h4&gt;
 
 &lt;p&gt;At least some people on the internet say, that something like this has
 happened to them after a crash (coincidentally my system crashed before the
@@ -1630,7 +1636,7 @@ check got rid of it. So you probably want to run &lt;code&gt;fsck -f &amp;lt;pat
 to run such a check. You probably also want to do that from a live-system, if
 you cannot unmount it (for example if it&amp;#39;s mounted at the root-dir).&lt;/p&gt;
 
-&lt;h1&gt;Do you have &lt;code&gt;dir_index&lt;/code&gt; enabled?&lt;/h1&gt;
+&lt;h4&gt;Do you have &lt;code&gt;dir_index&lt;/code&gt; enabled?&lt;/h4&gt;
 
 &lt;p&gt;So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does
@@ -1657,9 +1663,9 @@ check if you have &lt;code&gt;dir_index&lt;/code&gt; enabled and change the hash
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;&lt;span&gt;&lt;/span&gt;mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
 dir_index
 
-# Change the hash-algo to a bigger one
+#### Change the hash-algo to a bigger one
 mero@rincewind ~$ sudo tune2fs -E &amp;quot;hash_alg=tea&amp;quot; /dev/mapper/sda2_crypt
-# Disable it completely
+#### Disable it completely
 mero@rincewind ~$ sudo tune2fs -O &amp;quot;^dir_index&amp;quot;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Note however, that &lt;code&gt;dir_index&lt;/code&gt; and &lt;code&gt;half_md4&lt;/code&gt; where choices made for

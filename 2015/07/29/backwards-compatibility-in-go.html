@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>Backwards compatibility in go</title>
-        <meta name="viewport" content="width=device-width">
-        <link rel="stylesheet" href="/css/syntax.css">
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
-        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
-        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
-</script>
-    </head>
-    <body>
-        <div class="site">
-          <div class="header">
-            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
-          </div>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Backwards compatibility in go</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
 
-          <h2>Backwards compatibility in go</h2>
-<p class="meta">29 Jul 2015</p>
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
 
-<article class="post">
+    <main class="container">
+      <h3>Backwards compatibility in go</h3>
+<p>2015-07-29</p>
+
+<article>
 <p><strong>tl;dr: There are next to no &quot;backwards compatible API changes&quot; in go. You
 should explicitely name your compatibility-guarantees.</strong></p>
 
@@ -59,7 +62,7 @@ talk about in a meaningful way and must be dealt with separately anyway.
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:</p>
 
-<h1>Adding func/type/var/const at package scope</h1>
+<h4>Adding func/type/var/const at package scope</h4>
 
 <p>This is the only thing that seems to be fine under the stability guarantee.  It
 turns out the go authors thought about this one and put the exception of
@@ -77,23 +80,23 @@ to use a separate <code>foo_test</code> package for your tests to break dependen
 In that case it is widely deemed acceptable to <code>. import &quot;foo&quot;</code> to save typing
 and add clarity.</p>
 
-<h1>Removing func/type/var/const at package scope</h1>
+<h4>Removing func/type/var/const at package scope</h4>
 
 <p>Downstream might use the removed function/type/variable/constant, so this is
 obviously a breaking change.</p>
 
-<h1>Adding a method to an interface</h1>
+<h4>Adding a method to an interface</h4>
 
 <p>Downstream might want to create an implementation of your interface and try to
 pass it. After you add a method, this type doesn&#39;t implement your interface
 anymore and downstreams code will break.</p>
 
-<h1>Removing a method from an interface</h1>
+<h4>Removing a method from an interface</h4>
 
 <p>Downstream might want to call this method on a value of your interface type, so
 this is obviously a breaking change.</p>
 
-<h1>Adding a field to a struct</h1>
+<h4>Adding a field to a struct</h4>
 
 <p>This is perhaps surprising, but adding a field to a struct is a breaking
 change. The reason is, that downstream might embed two types into a struct. If
@@ -149,20 +152,20 @@ to write the selector and wrap every embedded method anyway.</p>
 <p>I hope we all agree that type embedding is awesome and shouldn&#39;t need to be
 avoided :)</p>
 
-<h1>Removing a field from a struct</h1>
+<h4>Removing a field from a struct</h4>
 
 <p>Downstream might use the now removed field, so this is obviously a breaking change.</p>
 
-<h1>Adding a method to a type</h1>
+<h4>Adding a method to a type</h4>
 
 <p>The argument is pretty much the same as adding a field to a struct: Downstream
 might embed your type and suddenly get ambiguities.</p>
 
-<h1>Removing a method from a type</h1>
+<h4>Removing a method from a type</h4>
 
 <p>Downstream might call the now removed method, so this is obviously a breaking change.</p>
 
-<h1>Changing a function/method signature</h1>
+<h4>Changing a function/method signature</h4>
 
 <p>Most changes are obviously breaking. But as it turns out you can&#39;t do <em>any</em>
 change to a function or method signature. This includes adding a variadic
@@ -172,7 +175,7 @@ call site will still be correct, right?</p>
 <p>The reason is, that downstream might save your function or method in a variable
 of the old type, which will break because of nonassignable types.</p>
 
-<h1>Conclusion</h1>
+<h4>Conclusion</h4>
 
 <p>It looks to me like anything that isn&#39;t just adding a new Identifier to the
 package-scope will potentially break <em>some</em> downstream. This severely limits
@@ -200,28 +203,32 @@ prevent frustrated downstreams.</p>
 compatibility promise is wrong or inaccurate. I would welcome comments on that,
 just like on everything else in this post :)</p>
 
-<!--
-
--->
 </article>
 
+    </main>
 
-          <div class="footer">
-            <div class="contact">
-              <p>
-                Axel Wagner<br />
-                Mathemematician, programmer, crazy person<br />
-              </p>
-            </div>
-            <div class="contact">
-              <p>
-                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
-				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
-                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
-                <a href="/impressum.html">Impressum</a><br />
-              </p>
-            </div>
-          </div>
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
         </div>
-    </body>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
 </html>

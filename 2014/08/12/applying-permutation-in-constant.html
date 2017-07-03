@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>Applying permutation in constant space (and linear time)</title>
-        <meta name="viewport" content="width=device-width">
-        <link rel="stylesheet" href="/css/syntax.css">
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
-        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
-        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
-</script>
-    </head>
-    <body>
-        <div class="site">
-          <div class="header">
-            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
-          </div>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Applying permutation in constant space (and linear time)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
 
-          <h2>Applying permutation in constant space (and linear time)</h2>
-<p class="meta">12 Aug 2014</p>
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
 
-<article class="post">
+    <main class="container">
+      <h3>Applying permutation in constant space (and linear time)</h3>
+<p>2014-08-12</p>
+
+<article>
 <p>I stumbled upon a mildly interesting problem yesterday: Given an Array a and a
 permutation p, apply the permutation (in place) to the Array, using only O(1)
 extra space.  So, if b is the array after the algorithm, we want that
@@ -116,8 +119,7 @@ example the permutation</p>
 p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
 </code></pre></div>
 <p>will create the following set of cycles:
-<br>
-<a href="/assets/permutation.svg"><img src="/assets/permutation.svg" style="width:100%;margin:auto;display:block;"></a></p>
+<a href="/assets/permutation.svg"><img src="/assets/permutation.svg"></a></p>
 
 <p>So the idea is to resolve every cycle separately, by iterating over the indices
 and moving every element to the place it belongs:</p>
@@ -182,35 +184,42 @@ with it ;)</p>
 
 <p>I ran sum Benchmarks on this an these are the figures I came up with:</p>
 
-<table>
-    <tr>
-        <th>n</th>
-        <td>10</td>
-        <td>100</td>
-        <td>1000</td>
-        <td>10000</td>
-    </tr>
-    <tr>
-        <th>Naive</th>
-        <td>332 ns</td>
-        <td>883 ns</td>
-        <td>15046 ns</td>
-        <td>81800 ns</td>
-    </tr>
-    <tr>
-        <th>NDCycle</th>
-        <td>130 ns</td>
-        <td>1019 ns</td>
-        <td>17978 ns</td>
-        <td>242121 ns</td>
-    </tr>
-    <tr>
-        <th>NDSort</th>
-        <td>1499 ns</td>
-        <td>27187 ns</td>
-        <td>473078 ns</td>
-        <td>4659433 ns</td>
-    </tr>
+<table class="highlight">
+    <thead>
+        <tr>
+            <th>n</th>
+            <th>Naive</th>
+            <th>NDCycle</th>
+            <th>NDSort</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        <tr>
+            <td>10</td>
+            <td>332 ns</td>
+            <td>130 ns</td>
+            <td>1499 ns</td>
+        </tr>
+        <tr>
+            <td>100</td>
+            <td>883 ns</td>
+            <td>1019 ns</td>
+            <td>27187 ns</td>
+        </tr>
+        <tr>
+            <td>1000</td>
+            <td>15046 ns</td>
+            <td>17978 ns</td>
+            <td>473078 ns</td>
+        </tr>
+        <tr>
+            <td>10000</td>
+            <td>81800 ns</td>
+            <td>242121 ns</td>
+            <td>4659433 ns</td>
+        </tr>
+    </tbody>
 </table>
 
 <p>I did not measure space-use. The time of NDCycle for 10000 elements seems
@@ -222,28 +231,32 @@ meantime, I
 code used here, so you can try it out yourself. You can run it with <code>go run
 perm.go</code> and run the benchmarks with <code>go test -bench Benchmark.*</code>.</p>
 
-<!--
-
--->
 </article>
 
+    </main>
 
-          <div class="footer">
-            <div class="contact">
-              <p>
-                Axel Wagner<br />
-                Mathemematician, programmer, crazy person<br />
-              </p>
-            </div>
-            <div class="contact">
-              <p>
-                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
-				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
-                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
-                <a href="/impressum.html">Impressum</a><br />
-              </p>
-            </div>
-          </div>
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
         </div>
-    </body>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
 </html>

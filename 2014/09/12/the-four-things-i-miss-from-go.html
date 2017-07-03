@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>The four things I miss about go</title>
-        <meta name="viewport" content="width=device-width">
-        <link rel="stylesheet" href="/css/syntax.css">
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
-        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
-        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
-</script>
-    </head>
-    <body>
-        <div class="site">
-          <div class="header">
-            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
-          </div>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>The four things I miss about go</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
 
-          <h2>The four things I miss about go</h2>
-<p class="meta">12 Sep 2014</p>
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
 
-<article class="post">
+    <main class="container">
+      <h3>The four things I miss about go</h3>
+<p>2014-09-12</p>
+
+<article>
 <p>As people who know me know, my current favourite language is
 <a href="http://golang.org/">go</a>. One of the best features of go is the lack of
 features. This is actually the reason I preferred C over most scripting
@@ -50,7 +53,7 @@ devs for prioritizing simplicity over making me happy.</p>
 
 <p><a name="generics"></a></p>
 
-<h1>Generics</h1>
+<h4>Generics</h4>
 
 <p>So let&#39;s get this elephant out of the room first. I think this is the most
 named feature lacking from go. They are asked so often, they have their own
@@ -138,7 +141,7 @@ web-crawler). The answer is to have the caller maintain this mapping via a
 
 <p><a name="weakrefs"></a></p>
 
-<h1>Weak references</h1>
+<h4>Weak references</h4>
 
 <p>I have to admit, that I am not sure, my use case here is really an important or
 even very nice one, but let&#39;s assume I want to have a database abstraction that
@@ -165,7 +168,7 @@ database).</p>
 
 <p><a name="dynload"></a></p>
 
-<h1>Dynamic loading of go code</h1>
+<h4>Dynamic loading of go code</h4>
 
 <p>It would be useful to be able to dynamically load go code at runtime, to build
 plugins for go software. Specifically I want a good go replacement for
@@ -204,7 +207,7 @@ nearish future.</p>
 
 <p><a name="gcgoroutines"></a></p>
 
-<h1>Garbage-collected goroutines</h1>
+<h4>Garbage-collected goroutines</h4>
 
 <p>Now, this is the only thing I really don&#39;t understand why it is not part of the
 language. Concurrency in go is a first-class citizen and garbage-collection is
@@ -280,28 +283,32 @@ diving into channels and concurrency right now is very much spoiled for me
 because I always have to think about draining every channel, always think about
 what goroutine closes what channels, passing cancellation-channels…</p>
 
-<!--
-
--->
 </article>
 
+    </main>
 
-          <div class="footer">
-            <div class="contact">
-              <p>
-                Axel Wagner<br />
-                Mathemematician, programmer, crazy person<br />
-              </p>
-            </div>
-            <div class="contact">
-              <p>
-                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
-				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
-                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
-                <a href="/impressum.html">Impressum</a><br />
-              </p>
-            </div>
-          </div>
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
         </div>
-    </body>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
 </html>

@@ -43,7 +43,7 @@ frustrated by it. In this post I want to explain why routers *in general* -
 including `http.ServeMux` - should be avoided and what I consider simple,
 maintainable and scalable routing using nothing but the stdlib.
 
-## But why?
+#### But why?
 
 ![But why?](https://i.giphy.com/1M9fmo1WAFVK0.webp)
 
@@ -117,7 +117,7 @@ packages needed in the whole application) and it becomes unmaintainable after a
 while. You can alleviate that by delegating to subrouters though; which really
 is the basis of how I prefer to do all of this these days.
 
-## How to use the stdlib to route
+#### How to use the stdlib to route
 
 Let's build the toy example from [this medium post](https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6).
 It's not terribly complicated but it serves nicely to illustrate the general
@@ -273,7 +273,7 @@ coupling. But that's not true. Its `UserHandler` could be created by a
 of your choice (flags, dependency injection,…) and gets wired up in `main`. All
 `App` needs to know is the API of the handlers it's *directly* invoking.
 
-## Conclusion
+#### Conclusion
 
 I hope I convinced you that routers *in and off itself* are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
@@ -511,7 +511,7 @@ So, given this definition of breakage, we can start enumerating all the
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:
 
-# Adding func/type/var/const at package scope
+#### Adding func/type/var/const at package scope
 
 This is the only thing that seems to be fine under the stability guarantee.  It
 turns out the go authors thought about this one and put the exception of
@@ -529,23 +529,23 @@ to use a separate `foo_test` package for your tests to break dependency cycles.
 In that case it is widely deemed acceptable to `. import "foo"` to save typing
 and add clarity.
 
-# Removing func/type/var/const at package scope
+#### Removing func/type/var/const at package scope
 
 Downstream might use the removed function/type/variable/constant, so this is
 obviously a breaking change.
 
-# Adding a method to an interface
+#### Adding a method to an interface
 
 Downstream might want to create an implementation of your interface and try to
 pass it. After you add a method, this type doesn't implement your interface
 anymore and downstreams code will break.
 
-# Removing a method from an interface
+#### Removing a method from an interface
 
 Downstream might want to call this method on a value of your interface type, so
 this is obviously a breaking change.
 
-# Adding a field to a struct
+#### Adding a field to a struct
 
 This is perhaps surprising, but adding a field to a struct is a breaking
 change. The reason is, that downstream might embed two types into a struct. If
@@ -602,20 +602,20 @@ to write the selector and wrap every embedded method anyway.
 I hope we all agree that type embedding is awesome and shouldn't need to be
 avoided :)
 
-# Removing a field from a struct
+#### Removing a field from a struct
 
 Downstream might use the now removed field, so this is obviously a breaking change.
 
-# Adding a method to a type
+#### Adding a method to a type
 
 The argument is pretty much the same as adding a field to a struct: Downstream
 might embed your type and suddenly get ambiguities.
 
-# Removing a method from a type
+#### Removing a method from a type
 
 Downstream might call the now removed method, so this is obviously a breaking change.
 
-# Changing a function/method signature
+#### Changing a function/method signature
 
 Most changes are obviously breaking. But as it turns out you can't do *any*
 change to a function or method signature. This includes adding a variadic
@@ -625,7 +625,7 @@ call site will still be correct, right?
 The reason is, that downstream might save your function or method in a variable
 of the old type, which will break because of nonassignable types.
 
-# Conclusion
+#### Conclusion
 
 It looks to me like anything that isn't just adding a new Identifier to the
 package-scope will potentially break *some* downstream. This severely limits
@@ -713,7 +713,7 @@ quite big API even bigger) :)
       <dc:date>2015-07-17T19:31:10+00:00</dc:date>
     </item>
     <item>
-      <title>Difficulties making SQL based authentication resilient against timing attacks</title>
+      <title>SQL authentication timing side-channels</title>
       <link>//blog.merovius.de//2015/04/13/difficulties-making-sql-based-au.html</link>
       <description><![CDATA[I&#39;ve been thinking about how to do an authentication scheme, that uses some
 kind of relational database (it doesn&#39;t matter specifically, that the database
@@ -843,7 +843,7 @@ So let's dig in.
 4. [Garbage-collected goroutines](#gcgoroutines)
 
 <a name="generics"></a>
-# Generics
+#### Generics
 
 So let's get this elephant out of the room first. I think this is the most
 named feature lacking from go. They are asked so often, they have their own
@@ -939,7 +939,7 @@ web-crawler). The answer is to have the caller maintain this mapping via a
 `map[Node]int` or something similar, but… meh.
 
 <a name="weakrefs"></a>
-# Weak references
+#### Weak references
 
 I have to admit, that I am not sure, my use case here is really an important or
 even very nice one, but let's assume I want to have a database abstraction that
@@ -965,7 +965,7 @@ happens, if the user gets the same value in two different goroutines from the
 database).
 
 <a name="dynload"></a>
-# Dynamic loading of go code
+#### Dynamic loading of go code
 
 It would be useful to be able to dynamically load go code at runtime, to build
 plugins for go software. Specifically I want a good go replacement for
@@ -1003,7 +1003,7 @@ put forward recently on how to implement this, so maybe we see this in the
 nearish future.
 
 <a name="gcgoroutines"></a>
-# Garbage-collected goroutines
+#### Garbage-collected goroutines
 
 Now, this is the only thing I really don't understand why it is not part of the
 language. Concurrency in go is a first-class citizen and garbage-collection is
@@ -1203,8 +1203,7 @@ p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
 ```
 
 will create the following set of cycles:
-<br>
-<a href="/assets/permutation.svg"><img src="/assets/permutation.svg" style="width:100%;margin:auto;display:block;"></a>
+<a href="/assets/permutation.svg"><img src="/assets/permutation.svg"></a>
 
 So the idea is to resolve every cycle separately, by iterating over the indices
 and moving every element to the place it belongs:
@@ -1275,35 +1274,42 @@ with it ;)
 
 I ran sum Benchmarks on this an these are the figures I came up with:
 
-<table>
-	<tr>
-		<th>n</th>
-		<td>10</td>
-		<td>100</td>
-		<td>1000</td>
-		<td>10000</td>
-	</tr>
-	<tr>
-		<th>Naive</th>
-		<td>332 ns</td>
-		<td>883 ns</td>
-		<td>15046 ns</td>
-		<td>81800 ns</td>
-	</tr>
-	<tr>
-		<th>NDCycle</th>
-		<td>130 ns</td>
-		<td>1019 ns</td>
-		<td>17978 ns</td>
-		<td>242121 ns</td>
-	</tr>
-	<tr>
-		<th>NDSort</th>
-		<td>1499 ns</td>
-		<td>27187 ns</td>
-		<td>473078 ns</td>
-		<td>4659433 ns</td>
-	</tr>
+<table class="highlight">
+	<thead>
+		<tr>
+			<th>n</th>
+			<th>Naive</th>
+			<th>NDCycle</th>
+			<th>NDSort</th>
+		</tr>
+	</thead>
+
+	<tbody>
+		<tr>
+			<td>10</td>
+			<td>332 ns</td>
+			<td>130 ns</td>
+			<td>1499 ns</td>
+		</tr>
+		<tr>
+			<td>100</td>
+			<td>883 ns</td>
+			<td>1019 ns</td>
+			<td>27187 ns</td>
+		</tr>
+		<tr>
+			<td>1000</td>
+			<td>15046 ns</td>
+			<td>17978 ns</td>
+			<td>473078 ns</td>
+		</tr>
+		<tr>
+			<td>10000</td>
+			<td>81800 ns</td>
+			<td>242121 ns</td>
+			<td>4659433 ns</td>
+		</tr>
+	</tbody>
 </table>
 
 I did not measure space-use. The time of NDCycle for 10000 elements seems
@@ -1543,12 +1549,12 @@ func DoFancyStuff(path string) error {
     <item>
       <title>Signed blog posts</title>
       <link>//blog.merovius.de//2014/01/23/signed-blog-posts.html</link>
-      <description><![CDATA[tl;dr: I sign my blogposts. curl
+      <description><![CDATA[tl;dr: I sign my blog posts. curl
 http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg
 ]]></description>
       <pubDate>Thu, 23 Jan 2014 04:04:25 +0000</pubDate>
       <guid>//blog.merovius.de//2014/01/23/signed-blog-posts.html</guid>
-      <content:encoded><![CDATA[**tl;dr: I sign my blogposts. curl
+      <content:encoded><![CDATA[**tl;dr: I sign my blog posts. curl
 http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg**
 
 I might have to update my TLS server certificate soon, because the last change
@@ -1668,9 +1674,9 @@ some extend — extrinsic incentives can only go this far in making us do some
 work; at some point, without at least some intrinsic motivation, I at least
 will not perform very well (or at all):
 
-<p style="text-align: center;">
-<iframe width="560" height="315" src="//www.youtube-nocookie.com/embed/rrkrvAUbU9Y" frameborder="0" allowfullscreen></iframe>
-</p>
+<div class="video-container">
+  <iframe width="560" height="315" src="//www.youtube-nocookie.com/embed/rrkrvAUbU9Y" frameborder="0" allowfullscreen></iframe>
+</div>
 ]]></content:encoded>
       <dc:date>2013-12-16T01:32:47+00:00</dc:date>
     </item>
@@ -1702,7 +1708,7 @@ It took me and a few friends a whole while to discover the problem. So if you
 ever get this error message (using ext4) you should probably check these four
 things (my issue was the last one):
 
-# Do you *actually* have enough space?
+#### Do you *actually* have enough space?
 
 Use `df -h`. There is actually a very common pitfall with ext4. Let's have a look:
 
@@ -1731,7 +1737,7 @@ Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
 ```
 
-# Do you have too many files?
+#### Do you have too many files?
 
 Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
@@ -1747,7 +1753,7 @@ So as you see, that wasn't the problem with me. But if you ever have the `IUse%`
 column near 100, you probably want to delete some old files (and you should
 *definitely* question, how so many files could be created to begin with).
 
-# Do a file system check
+#### Do a file system check
 
 At least some people on the internet say, that something like this has
 happened to them after a crash (coincidentally my system crashed before the
@@ -1756,7 +1762,7 @@ check got rid of it. So you probably want to run `fsck -f <path_to_your_disk>`
 to run such a check. You probably also want to do that from a live-system, if
 you cannot unmount it (for example if it's mounted at the root-dir).
 
-# Do you have `dir_index` enabled?
+#### Do you have `dir_index` enabled?
 
 So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does
@@ -1785,9 +1791,9 @@ check if you have `dir_index` enabled and change the hash, like this:
 mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
 dir_index
 
-# Change the hash-algo to a bigger one
+#### Change the hash-algo to a bigger one
 mero@rincewind ~$ sudo tune2fs -E "hash_alg=tea" /dev/mapper/sda2_crypt
-# Disable it completely
+#### Disable it completely
 mero@rincewind ~$ sudo tune2fs -O "^dir_index"
 ```
 

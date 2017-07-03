@@ -1,91 +1,560 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>Mero's Blog</title>
-        <meta name="viewport" content="width=device-width">
-        <link rel="stylesheet" href="/css/syntax.css">
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
-        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
-        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
-</script>
-    </head>
-    <body>
-        <div class="site">
-          <div class="header">
-            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
-          </div>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Mero's Blog</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
 
-          <div id="home">
-  <h1>Blog Posts</h1>
-  <ul class="posts">
-    
-      <li><span>18 Jun 2017</span> &raquo; <a href="/2017/06/18/how-not-to-use-an-http-router.html">How to not use an http-router in go</a></li>
-    
-      <li><span>31 Aug 2016</span> &raquo; <a href="/2016/08/31/ive-been-diagnosed-with-adhd.html">I've been diagnosed with ADHD</a></li>
-    
-      <li><span>29 Jul 2015</span> &raquo; <a href="/2015/07/29/backwards-compatibility-in-go.html">Backwards compatibility in go</a></li>
-    
-      <li><span>17 Jul 2015</span> &raquo; <a href="/2015/07/17/lazy-evaluation-in-go.html">Lazy evaluation in go</a></li>
-    
-      <li><span>13 Apr 2015</span> &raquo; <a href="/2015/04/13/difficulties-making-sql-based-au.html">Difficulties making SQL based authentication resilient against timing attacks</a></li>
-    
-      <li><span>12 Sep 2014</span> &raquo; <a href="/2014/09/12/the-four-things-i-miss-from-go.html">The four things I miss about go</a></li>
-    
-      <li><span>12 Aug 2014</span> &raquo; <a href="/2014/08/12/applying-permutation-in-constant.html">Applying permutation in constant space (and linear time)</a></li>
-    
-      <li><span>22 Jun 2014</span> &raquo; <a href="/2014/06/22/gpn14-gamejam-crazy-cat-lady.html">GPN14 GameJam - Crazy cat lady</a></li>
-    
-      <li><span>06 May 2014</span> &raquo; <a href="/2014/05/06/python-fnord-of-the-day.html">Python-fnord of the day</a></li>
-    
-      <li><span>10 Apr 2014</span> &raquo; <a href="/2014/04/10/heartbleed-new-certificates.html">Heartbleed: New certificates</a></li>
-    
-      <li><span>19 Feb 2014</span> &raquo; <a href="/2014/02/19/go-stacktraces.html">go stacktraces</a></li>
-    
-      <li><span>23 Jan 2014</span> &raquo; <a href="/2014/01/23/signed-blog-posts.html">Signed blog posts</a></li>
-    
-      <li><span>16 Dec 2013</span> &raquo; <a href="/2013/12/16/incentives-in-education.html">Incentives in education</a></li>
-    
-      <li><span>20 Oct 2013</span> &raquo; <a href="/2013/10/20/ext4-mysterious-no-space-left-on.html">ext4: Mysterious “No space left on device”-errors</a></li>
-    
-      <li><span>20 Oct 2013</span> &raquo; <a href="/2013/10/20/using-i3-and-vim-to-keep-a-set-o.html">Using i3 and vim to keep a set of notes at hand</a></li>
-    
-      <li><span>19 Oct 2013</span> &raquo; <a href="/2013/10/19/tic-tac-toe-ai.html">Tic Tac Toe AI</a></li>
-    
-      <li><span>11 Oct 2013</span> &raquo; <a href="/2013/10/11/inject-environment-variables-int.html">Inject Environment variables into running processes</a></li>
-    
-      <li><span>11 Oct 2013</span> &raquo; <a href="/2013/10/11/how-to-cgolf.html">How to C-Golf</a></li>
-    
-      <li><span>03 Oct 2013</span> &raquo; <a href="/2013/10/03/new-pgp-key.html">New PGP Key</a></li>
-    
-      <li><span>28 Sep 2013</span> &raquo; <a href="/2013/09/28/lazy-blogging-with-jekyll.html">Lazy blogging with jekyll</a></li>
-    
-      <li><span>28 Sep 2013</span> &raquo; <a href="/2013/09/28/firstyear-introductory-course-fo.html">First-year introductory course for programming</a></li>
-    
-      <li><span>28 Sep 2013</span> &raquo; <a href="/2013/09/28/relaunch.html">Relaunch</a></li>
-    
-  </ul>
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
+
+    <main class="container">
+      <div class="row">
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2017/06/18/how-not-to-use-an-http-router.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">How to not use an http-router in go</span>
+          
+            <p>Trying to provide some advice on how to do easy, readable, scalable routing in go, without relying on any muxers/routers (or writing your own).</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2017-06-18<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#golang</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2016/08/31/ive-been-diagnosed-with-adhd.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">I've been diagnosed with ADHD</span>
+          
+            <p>I've been diagnosed with ADHD. I ramble incoherently for a while and I might do some less rambling posts about it in the future.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2016-08-31<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#personal</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2015/07/29/backwards-compatibility-in-go.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Backwards compatibility in go</span>
+          
+            <p>There are next to no "backwards compatible API changes" in go. You should explicitely name your compatibility-guarantees.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2015-07-29<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#golang</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2015/07/17/lazy-evaluation-in-go.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Lazy evaluation in go</span>
+          
+            <p>I did lazy evaluation in go.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2015-07-17<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#golang</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2015/04/13/difficulties-making-sql-based-au.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">SQL authentication timing side-channels</span>
+          
+            <p>It is surprisingly hard to make SQL-based authentication immune to timing side-channels, if you want to prevent enumeration of users.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2015-04-13<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/09/12/the-four-things-i-miss-from-go.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">The four things I miss about go</span>
+          
+            <p>A short list of four things that I might want to add to go (but probably wouldn't).</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-09-12<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#golang</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/08/12/applying-permutation-in-constant.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Applying permutation in constant space (and linear time)</span>
+          
+            <p>A mildly interesting algorithmic problem and my solution to it.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-08-12<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#golang</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/06/22/gpn14-gamejam-crazy-cat-lady.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">GPN14 GameJam - Crazy cat lady</span>
+          
+            <p>We made a gamejam-game.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-06-22<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/05/06/python-fnord-of-the-day.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Python-fnord of the day</span>
+          
+            <p>An unexpected behavior of python that surprised me today.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-05-06<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#python</li>
+            
+              <li class="right">#programming</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/04/10/heartbleed-new-certificates.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Heartbleed: New certificates</span>
+          
+            <p>Updating my TLS-certificates due to Heartbleed.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-04-10<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#meta</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/02/19/go-stacktraces.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">go stacktraces</span>
+          
+            <p>A small pattern to add stacktraces to errors.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-02-19<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#golang</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2014/01/23/signed-blog-posts.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Signed blog posts</span>
+          
+            <p>I sign my blog posts.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2014-01-23<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#meta</li>
+            
+              <li class="right">#crypto</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/12/16/incentives-in-education.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Incentives in education</span>
+          
+            <p>I hate software-engineering as it is teached in Heidelberg. Really.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-12-16<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#education</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/10/20/ext4-mysterious-no-space-left-on.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">ext4: Mysterious “No space left on device”-errors</span>
+          
+            <p>ext4 has a feature called dir_index enabled by default, which is quite susceptible to hash-collisions</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-10-20<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#linux</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/10/20/using-i3-and-vim-to-keep-a-set-o.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Using i3 and vim to keep a set of notes at hand</span>
+          
+            <p>Put a terminal with a vim-instance in an i3-scratchpad, combine it with autosave-when-idle and you got the perfect note keeping workflow."</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-10-20<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#linux</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/10/19/tic-tac-toe-ai.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Tic Tac Toe AI</span>
+          
+            <p>I wrote a simple Tic Tac Toe AI as an exercise. You can get it on github.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-10-19<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/10/11/inject-environment-variables-int.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Inject Environment variables into running processes</span>
+          
+            <p>Using gdb to manipulate a running process is fun and just the right amount of danger to be exiting</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-10-11<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#linux</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/10/11/how-to-cgolf.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">How to C-Golf</span>
+          
+            <p>We had a codegolf challenge recently. My C-solution was 246 byte, the perl-winner was 191. I decided to give notes for C-golf beginners.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-10-11<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#C</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/10/03/new-pgp-key.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">New PGP Key</span>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-10-03<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#meta</li>
+            
+              <li class="right">#crypto</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/09/28/lazy-blogging-with-jekyll.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Lazy blogging with jekyll</span>
+          
+            <p>I put up a small script to automate creating blog-posts in jekyll</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-09-28<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#meta</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/09/28/firstyear-introductory-course-fo.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">First-year introductory course for programming</span>
+          
+            <p>I gave a very introductory programming course and saw once again how the basic ideas underlying the modernization of teaching just work when implemented right.</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-09-28<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#programming</li>
+            
+              <li class="right">#education</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
+  <div class="col s12 m12 l6 xl4">
+    <a class="black-text" href="/2013/09/28/relaunch.html">
+      <div class="card small hoverable">
+        <div class="card-content">
+          <span class="card-title">Relaunch</span>
+          
+            <p>The (n+1)th launch of my blog</p>
+          
+        </div>
+        <div class="card-action">
+          <span>2013-09-28<span>
+          <ul class="taglist right">
+            
+            
+              <li class="right">#meta</li>
+            
+          </ul>
+        </div>
+      </div>
+    </a>
+  </div>
+  
 </div>
 
+    </main>
 
-          <div class="footer">
-            <div class="contact">
-              <p>
-                Axel Wagner<br />
-                Mathemematician, programmer, crazy person<br />
-              </p>
-            </div>
-            <div class="contact">
-              <p>
-                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
-				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
-                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
-                <a href="/impressum.html">Impressum</a><br />
-              </p>
-            </div>
-          </div>
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
         </div>
-    </body>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
 </html>

@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>How to not use an http-router in go</title>
-        <meta name="viewport" content="width=device-width">
-        <link rel="stylesheet" href="/css/syntax.css">
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
-        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
-        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
-</script>
-    </head>
-    <body>
-        <div class="site">
-          <div class="header">
-            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
-          </div>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>How to not use an http-router in go</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
 
-          <h2>How to not use an http-router in go</h2>
-<p class="meta">18 Jun 2017</p>
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
 
-<article class="post">
+    <main class="container">
+      <h3>How to not use an http-router in go</h3>
+<p>2017-06-18</p>
+
+<article>
 <p><strong>If you don&#39;t write web-thingies in go you can stop reading now. Also, I am
 somewhat snarky in this article. I intend that to be humorous but am probably
 failing. Sorry for that</strong></p>
@@ -47,7 +50,7 @@ frustrated by it. In this post I want to explain why routers <em>in general</em>
 including <code>http.ServeMux</code> - should be avoided and what I consider simple,
 maintainable and scalable routing using nothing but the stdlib.</p>
 
-<h2>But why?</h2>
+<h4>But why?</h4>
 
 <p><img src="https://i.giphy.com/1M9fmo1WAFVK0.webp" alt="But why?"></p>
 
@@ -120,7 +123,7 @@ packages needed in the whole application) and it becomes unmaintainable after a
 while. You can alleviate that by delegating to subrouters though; which really
 is the basis of how I prefer to do all of this these days.</p>
 
-<h2>How to use the stdlib to route</h2>
+<h4>How to use the stdlib to route</h4>
 
 <p>Let&#39;s build the toy example from <a href="https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6">this medium post</a>.
 It&#39;s not terribly complicated but it serves nicely to illustrate the general
@@ -267,7 +270,7 @@ coupling. But that&#39;s not true. Its <code>UserHandler</code> could be created
 of your choice (flags, dependency injection,…) and gets wired up in <code>main</code>. All
 <code>App</code> needs to know is the API of the handlers it&#39;s <em>directly</em> invoking.</p>
 
-<h2>Conclusion</h2>
+<h4>Conclusion</h4>
 
 <p>I hope I convinced you that routers <em>in and off itself</em> are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
@@ -279,28 +282,32 @@ routing decisions on, you are tempted to write your own. Which everyone does.</p
 express them in their own handlers. And wire the dependencies up at compile
 time, using the type system of go, and reduce coupling.</p>
 
-<!--
-
--->
 </article>
 
+    </main>
 
-          <div class="footer">
-            <div class="contact">
-              <p>
-                Axel Wagner<br />
-                Mathemematician, programmer, crazy person<br />
-              </p>
-            </div>
-            <div class="contact">
-              <p>
-                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
-				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
-                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
-                <a href="/impressum.html">Impressum</a><br />
-              </p>
-            </div>
-          </div>
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
         </div>
-    </body>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
 </html>

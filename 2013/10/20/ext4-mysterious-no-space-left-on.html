@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-        <title>ext4: Mysterious “No space left on device”-errors</title>
-        <meta name="viewport" content="width=device-width">
-        <link rel="stylesheet" href="/css/syntax.css">
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
-        <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
-        <script type="text/javascript" src="https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js">
-</script>
-    </head>
-    <body>
-        <div class="site">
-          <div class="header">
-            <h1 class="title"><a href="/">Between a rock and a crazy place</a></h1>
-          </div>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>ext4: Mysterious “No space left on device”-errors</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
 
-          <h2>ext4: Mysterious “No space left on device”-errors</h2>
-<p class="meta">20 Oct 2013</p>
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="linux">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
 
-<article class="post">
+    <main class="container">
+      <h3>ext4: Mysterious “No space left on device”-errors</h3>
+<p>2013-10-20</p>
+
+<article>
 <p><strong>tl;dr: ext4 has a feature called <code>dir_index</code> enabled by default, which is
 quite susceptible to hash-collisions</strong></p>
 
@@ -42,7 +45,7 @@ that&#39;s a different story). But there actually was plenty of space left.</p>
 ever get this error message (using ext4) you should probably check these four
 things (my issue was the last one):</p>
 
-<h1>Do you <em>actually</em> have enough space?</h1>
+<h4>Do you <em>actually</em> have enough space?</h4>
 
 <p>Use <code>df -h</code>. There is actually a very common pitfall with ext4. Let&#39;s have a look:</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>mero@rincewind ~$ df -h
@@ -65,7 +68,7 @@ Reserved block count:     2499541
 Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
 </code></pre></div>
-<h1>Do you have too many files?</h1>
+<h4>Do you have too many files?</h4>
 
 <p>Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
@@ -78,7 +81,7 @@ it is limited. Checking this is easy: Just use <code>df -i</code>:</p>
 column near 100, you probably want to delete some old files (and you should
 <em>definitely</em> question, how so many files could be created to begin with).</p>
 
-<h1>Do a file system check</h1>
+<h4>Do a file system check</h4>
 
 <p>At least some people on the internet say, that something like this has
 happened to them after a crash (coincidentally my system crashed before the
@@ -87,7 +90,7 @@ check got rid of it. So you probably want to run <code>fsck -f &lt;path_to_your_
 to run such a check. You probably also want to do that from a live-system, if
 you cannot unmount it (for example if it&#39;s mounted at the root-dir).</p>
 
-<h1>Do you have <code>dir_index</code> enabled?</h1>
+<h4>Do you have <code>dir_index</code> enabled?</h4>
 
 <p>So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does
@@ -114,9 +117,9 @@ check if you have <code>dir_index</code> enabled and change the hash, like this:
 <div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
 dir_index
 
-# Change the hash-algo to a bigger one
+#### Change the hash-algo to a bigger one
 mero@rincewind ~$ sudo tune2fs -E &quot;hash_alg=tea&quot; /dev/mapper/sda2_crypt
-# Disable it completely
+#### Disable it completely
 mero@rincewind ~$ sudo tune2fs -O &quot;^dir_index&quot;
 </code></pre></div>
 <p>Note however, that <code>dir_index</code> and <code>half_md4</code> where choices made for
@@ -142,28 +145,32 @@ about 10K collisions on 60K files), which would suggest, that my original
 sample (meaning my mailbox) exhibits some properties that make collisions more
 likely both on <code>half_md4</code> <em>and</em> <code>tea</code>.</p>
 
-<!--
-
--->
 </article>
 
+    </main>
 
-          <div class="footer">
-            <div class="contact">
-              <p>
-                Axel Wagner<br />
-                Mathemematician, programmer, crazy person<br />
-              </p>
-            </div>
-            <div class="contact">
-              <p>
-                <a href="https://github.com/Merovius">github.com/Merovius</a><br />
-				<a href="https://twitter.com/TheMerovius">@TheMerovius</a><br />
-                <a href="https://plus.google.com/104026434400286502583">+Axel Wagner</a><br />
-                <a href="/impressum.html">Impressum</a><br />
-              </p>
-            </div>
-          </div>
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
         </div>
-    </body>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
 </html>
