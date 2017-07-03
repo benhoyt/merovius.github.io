@@ -1,6 +1,7 @@
 ---
 layout: post
 title: "New PGP Key"
+tags: ["crypto", "meta"]
 date: 2013-10-03 00:44:00
 ---
 

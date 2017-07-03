@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Tic Tac Toe AI"
+tldr: "I wrote a simple Tic Tac Toe AI as an exercise. You can get it on github."
+tags: ["programming"]
 date: 2013-10-19 01:58:04
 ---
 

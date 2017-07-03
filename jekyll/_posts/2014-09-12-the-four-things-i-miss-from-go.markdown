@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "The four things I miss about go"
+tldr: "A short list of four things that I might want to add to go (but probably wouldn't)."
+tags: ["golang", "programming"]
 date: 2014-09-12 17:10:28
 ---
 As people who know me know, my current favourite language is
@@ -28,7 +30,7 @@ So let's dig in.
 4. [Garbage-collected goroutines](#gcgoroutines)
 
 <a name="generics"></a>
-# Generics
+#### Generics
 
 So let's get this elephant out of the room first. I think this is the most
 named feature lacking from go. They are asked so often, they have their own
@@ -124,7 +126,7 @@ web-crawler). The answer is to have the caller maintain this mapping via a
 `map[Node]int` or something similar, but… meh.
 
 <a name="weakrefs"></a>
-# Weak references
+#### Weak references
 
 I have to admit, that I am not sure, my use case here is really an important or
 even very nice one, but let's assume I want to have a database abstraction that
@@ -150,7 +152,7 @@ happens, if the user gets the same value in two different goroutines from the
 database).
 
 <a name="dynload"></a>
-# Dynamic loading of go code
+#### Dynamic loading of go code
 
 It would be useful to be able to dynamically load go code at runtime, to build
 plugins for go software. Specifically I want a good go replacement for
@@ -188,7 +190,7 @@ put forward recently on how to implement this, so maybe we see this in the
 nearish future.
 
 <a name="gcgoroutines"></a>
-# Garbage-collected goroutines
+#### Garbage-collected goroutines
 
 Now, this is the only thing I really don't understand why it is not part of the
 language. Concurrency in go is a first-class citizen and garbage-collection is

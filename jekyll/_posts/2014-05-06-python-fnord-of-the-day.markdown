@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Python-fnord of the day"
+tldr: "An unexpected behavior of python that surprised me today."
+tags: ["programming", "python"]
 date: 2014-05-06 01:07:28
 ---
 

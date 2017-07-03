@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Lazy blogging with jekyll"
+tldr: "I put up a small script to automate creating blog-posts in jekyll"
+tags: ["meta", "programming"]
 date: 2013-09-28 15:11:10
 ---
 

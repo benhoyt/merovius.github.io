@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Incentives in education"
+tldr: "I hate software-engineering as it is teached in Heidelberg. Really."
+tags: ["education"]
 date: 2013-12-16 01:32:47
 ---
 
@@ -60,6 +62,6 @@ some extend — extrinsic incentives can only go this far in making us do some
 work; at some point, without at least some intrinsic motivation, I at least
 will not perform very well (or at all):
 
-<p style="text-align: center;">
-<iframe width="560" height="315" src="//www.youtube-nocookie.com/embed/rrkrvAUbU9Y" frameborder="0" allowfullscreen></iframe>
-</p>
+<div class="video-container">
+  <iframe width="560" height="315" src="//www.youtube-nocookie.com/embed/rrkrvAUbU9Y" frameborder="0" allowfullscreen></iframe>
+</div>

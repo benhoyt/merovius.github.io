@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "ext4: Mysterious “No space left on device”-errors"
+tldr: "ext4 has a feature called dir_index enabled by default, which is quite susceptible to hash-collisions"
+tags: ["linux"]
 date: 2013-10-20 21:13:07
 ---
 
@@ -24,7 +26,7 @@ It took me and a few friends a whole while to discover the problem. So if you
 ever get this error message (using ext4) you should probably check these four
 things (my issue was the last one):
 
-# Do you *actually* have enough space?
+#### Do you *actually* have enough space?
 
 Use `df -h`. There is actually a very common pitfall with ext4. Let's have a look:
 
@@ -53,7 +55,7 @@ Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
 ```
 
-# Do you have too many files?
+#### Do you have too many files?
 
 Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
@@ -69,7 +71,7 @@ So as you see, that wasn't the problem with me. But if you ever have the `IUse%`
 column near 100, you probably want to delete some old files (and you should
 *definitely* question, how so many files could be created to begin with).
 
-# Do a file system check
+#### Do a file system check
 
 At least some people on the internet say, that something like this has
 happened to them after a crash (coincidentally my system crashed before the
@@ -78,7 +80,7 @@ check got rid of it. So you probably want to run `fsck -f <path_to_your_disk>`
 to run such a check. You probably also want to do that from a live-system, if
 you cannot unmount it (for example if it's mounted at the root-dir).
 
-# Do you have `dir_index` enabled?
+#### Do you have `dir_index` enabled?
 
 So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does
@@ -107,9 +109,9 @@ check if you have `dir_index` enabled and change the hash, like this:
 mero@rincewind ~$ sudo tune2fs -l /dev/mapper/sda2_crypt | grep -o dir_index
 dir_index
 
-# Change the hash-algo to a bigger one
+#### Change the hash-algo to a bigger one
 mero@rincewind ~$ sudo tune2fs -E "hash_alg=tea" /dev/mapper/sda2_crypt
-# Disable it completely
+#### Disable it completely
 mero@rincewind ~$ sudo tune2fs -O "^dir_index"
 ```
 

@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Applying permutation in constant space (and linear time)"
+tldr: "A mildly interesting algorithmic problem and my solution to it."
+tags: ["golang", "programming"]
 date: 2014-08-12 11:10:21
 ---
 I stumbled upon a mildly interesting problem yesterday: Given an Array a and a
@@ -109,8 +111,7 @@ p[i] 2  13 1  5  3  15 14 12 8  10 4  19 16 11 9  7  18 6  17 0
 ```
 
 will create the following set of cycles:
-<br>
-<a href="/assets/permutation.svg"><img src="/assets/permutation.svg" style="width:100%;margin:auto;display:block;"></a>
+<a href="/assets/permutation.svg"><img src="/assets/permutation.svg"></a>
 
 So the idea is to resolve every cycle separately, by iterating over the indices
 and moving every element to the place it belongs:
@@ -181,35 +182,42 @@ with it ;)
 
 I ran sum Benchmarks on this an these are the figures I came up with:
 
-<table>
-	<tr>
-		<th>n</th>
-		<td>10</td>
-		<td>100</td>
-		<td>1000</td>
-		<td>10000</td>
-	</tr>
-	<tr>
-		<th>Naive</th>
-		<td>332 ns</td>
-		<td>883 ns</td>
-		<td>15046 ns</td>
-		<td>81800 ns</td>
-	</tr>
-	<tr>
-		<th>NDCycle</th>
-		<td>130 ns</td>
-		<td>1019 ns</td>
-		<td>17978 ns</td>
-		<td>242121 ns</td>
-	</tr>
-	<tr>
-		<th>NDSort</th>
-		<td>1499 ns</td>
-		<td>27187 ns</td>
-		<td>473078 ns</td>
-		<td>4659433 ns</td>
-	</tr>
+<table class="highlight">
+	<thead>
+		<tr>
+			<th>n</th>
+			<th>Naive</th>
+			<th>NDCycle</th>
+			<th>NDSort</th>
+		</tr>
+	</thead>
+
+	<tbody>
+		<tr>
+			<td>10</td>
+			<td>332 ns</td>
+			<td>130 ns</td>
+			<td>1499 ns</td>
+		</tr>
+		<tr>
+			<td>100</td>
+			<td>883 ns</td>
+			<td>1019 ns</td>
+			<td>27187 ns</td>
+		</tr>
+		<tr>
+			<td>1000</td>
+			<td>15046 ns</td>
+			<td>17978 ns</td>
+			<td>473078 ns</td>
+		</tr>
+		<tr>
+			<td>10000</td>
+			<td>81800 ns</td>
+			<td>242121 ns</td>
+			<td>4659433 ns</td>
+		</tr>
+	</tbody>
 </table>
 
 I did not measure space-use. The time of NDCycle for 10000 elements seems

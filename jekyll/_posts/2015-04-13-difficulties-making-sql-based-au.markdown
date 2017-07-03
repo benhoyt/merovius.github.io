@@ -1,6 +1,8 @@
 ---
 layout: post
-title: "Difficulties making SQL based authentication resilient against timing attacks"
+title: "SQL authentication timing side-channels"
+tldr: "It is surprisingly hard to make SQL-based authentication immune to timing side-channels, if you want to prevent enumeration of users."
+tags: ["programming"]
 date: 2015-04-13 02:49:53
 ---
 I've been thinking about how to do an authentication scheme, that uses some

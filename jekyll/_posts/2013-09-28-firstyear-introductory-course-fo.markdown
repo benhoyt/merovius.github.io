@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "First-year introductory course for programming"
+tldr: "I gave a very introductory programming course and saw once again how the basic ideas underlying the modernization of teaching just work when implemented right."
+tags: ["education", "programming"]
 date: 2013-09-28 03:16:52
 ---
 

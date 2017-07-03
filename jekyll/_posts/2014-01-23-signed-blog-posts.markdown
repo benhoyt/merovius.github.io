@@ -1,10 +1,12 @@
 ---
 layout: post
 title: "Signed blog posts"
+tldr: "I sign my blog posts."
+tags: ["crypto", "meta"]
 date: 2014-01-23 04:04:25
 ---
 
-**tl;dr: I sign my blogposts. curl
+**tl;dr: I sign my blog posts. curl
 http://blog.merovius.de/2014/01/23/signed-blog-posts.html | gpg**
 
 I might have to update my TLS server certificate soon, because the last change

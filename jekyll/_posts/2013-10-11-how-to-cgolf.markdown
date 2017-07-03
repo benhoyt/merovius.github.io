@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "How to C-Golf"
+tldr: "We had a codegolf challenge recently. My C-solution was 246 byte, the perl-winner was 191. I decided to give notes for C-golf beginners."
+tags: ["C", "programming"]
 date: 2013-10-11 02:09:38
 ---
 

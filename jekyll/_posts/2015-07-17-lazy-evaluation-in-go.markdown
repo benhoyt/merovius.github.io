@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Lazy evaluation in go"
+tldr: "I did lazy evaluation in go."
+tags: ["golang", "programming"]
 date: 2015-07-17 19:31:10
 ---
 

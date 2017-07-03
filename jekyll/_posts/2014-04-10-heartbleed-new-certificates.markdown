@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Heartbleed: New certificates"
+tldr: "Updating my TLS-certificates due to Heartbleed."
+tags: ["meta"]
 date: 2014-04-10 21:28:25
 ---
 Due to the Heartbleed vulnerability I had to recreate all TLS-keys of my

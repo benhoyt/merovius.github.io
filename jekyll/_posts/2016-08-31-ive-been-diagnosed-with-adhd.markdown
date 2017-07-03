@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "I've been diagnosed with ADHD"
+tldr: "I've been diagnosed with ADHD. I ramble incoherently for a while and I might do some less rambling posts about it in the future."
+tags: ["personal"]
 date: 2016-08-31 02:22:38
 ---
 

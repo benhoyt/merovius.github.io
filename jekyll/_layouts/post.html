@@ -1,12 +1,9 @@
 ---
 layout: default
 ---
-<h2>{{ page.title }}</h2>
-<p class="meta">{{ page.date | date_to_string }}</p>
+<h3>{{ page.title }}</h3>
+<p>{{ page.date | date: "%Y-%m-%d" }}</p>
 
-<article class="post">
+<article>
 {{ content }}
-<!--
-{{ page.signature }}
--->
 </article>

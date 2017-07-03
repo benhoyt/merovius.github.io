@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Backwards compatibility in go"
+tldr: "There are next to no \"backwards compatible API changes\" in go. You should explicitely name your compatibility-guarantees."
+tags: ["golang", "programming"]
 date: 2015-07-29 01:10:11
 ---
 
@@ -41,7 +43,7 @@ So, given this definition of breakage, we can start enumerating all the
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:
 
-# Adding func/type/var/const at package scope
+#### Adding func/type/var/const at package scope
 
 This is the only thing that seems to be fine under the stability guarantee.  It
 turns out the go authors thought about this one and put the exception of
@@ -59,23 +61,23 @@ to use a separate `foo_test` package for your tests to break dependency cycles.
 In that case it is widely deemed acceptable to `. import "foo"` to save typing
 and add clarity.
 
-# Removing func/type/var/const at package scope
+#### Removing func/type/var/const at package scope
 
 Downstream might use the removed function/type/variable/constant, so this is
 obviously a breaking change.
 
-# Adding a method to an interface
+#### Adding a method to an interface
 
 Downstream might want to create an implementation of your interface and try to
 pass it. After you add a method, this type doesn't implement your interface
 anymore and downstreams code will break.
 
-# Removing a method from an interface
+#### Removing a method from an interface
 
 Downstream might want to call this method on a value of your interface type, so
 this is obviously a breaking change.
 
-# Adding a field to a struct
+#### Adding a field to a struct
 
 This is perhaps surprising, but adding a field to a struct is a breaking
 change. The reason is, that downstream might embed two types into a struct. If
@@ -132,20 +134,20 @@ to write the selector and wrap every embedded method anyway.
 I hope we all agree that type embedding is awesome and shouldn't need to be
 avoided :)
 
-# Removing a field from a struct
+#### Removing a field from a struct
 
 Downstream might use the now removed field, so this is obviously a breaking change.
 
-# Adding a method to a type
+#### Adding a method to a type
 
 The argument is pretty much the same as adding a field to a struct: Downstream
 might embed your type and suddenly get ambiguities.
 
-# Removing a method from a type
+#### Removing a method from a type
 
 Downstream might call the now removed method, so this is obviously a breaking change.
 
-# Changing a function/method signature
+#### Changing a function/method signature
 
 Most changes are obviously breaking. But as it turns out you can't do *any*
 change to a function or method signature. This includes adding a variadic
@@ -155,7 +157,7 @@ call site will still be correct, right?
 The reason is, that downstream might save your function or method in a variable
 of the old type, which will break because of nonassignable types.
 
-# Conclusion
+#### Conclusion
 
 It looks to me like anything that isn't just adding a new Identifier to the
 package-scope will potentially break *some* downstream. This severely limits

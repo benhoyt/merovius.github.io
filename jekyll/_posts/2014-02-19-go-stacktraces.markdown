@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "go stacktraces"
+tldr: "A small pattern to add stacktraces to errors."
+tags: ["golang", "programming"]
 date: 2014-02-19 02:17:59
 ---
 

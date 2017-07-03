@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Inject Environment variables into running processes"
+tldr: "Using gdb to manipulate a running process is fun and just the right amount of danger to be exiting"
+tags: ["linux"]
 date: 2013-10-11 03:25:09
 ---
 

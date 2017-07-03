@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Relaunch"
+tldr: "The (n+1)th launch of my blog"
+tags: ["meta"]
 date: 2013-09-28 02:08:05
 ---
 

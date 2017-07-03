@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "Using i3 and vim to keep a set of notes at hand"
+tldr: Put a terminal with a vim-instance in an i3-scratchpad, combine it with autosave-when-idle and you got the perfect note keeping workflow."
+tags: ["linux"]
 date: 2013-10-20 03:45:52
 ---
 

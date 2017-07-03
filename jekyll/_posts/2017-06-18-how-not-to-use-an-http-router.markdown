@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "How to not use an http-router in go"
+tldr: "Trying to provide some advice on how to do easy, readable, scalable routing in go, without relying on any muxers/routers (or writing your own)."
+tags: ["golang", "programming"]
 date: 2017-06-18 22:57:21
 ---
 
@@ -29,7 +31,7 @@ frustrated by it. In this post I want to explain why routers *in general* -
 including `http.ServeMux` - should be avoided and what I consider simple,
 maintainable and scalable routing using nothing but the stdlib.
 
-## But why?
+#### But why?
 
 ![But why?](https://i.giphy.com/1M9fmo1WAFVK0.webp)
 
@@ -103,7 +105,7 @@ packages needed in the whole application) and it becomes unmaintainable after a
 while. You can alleviate that by delegating to subrouters though; which really
 is the basis of how I prefer to do all of this these days.
 
-## How to use the stdlib to route
+#### How to use the stdlib to route
 
 Let's build the toy example from [this medium post](https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6).
 It's not terribly complicated but it serves nicely to illustrate the general
@@ -259,7 +261,7 @@ coupling. But that's not true. Its `UserHandler` could be created by a
 of your choice (flags, dependency injection,…) and gets wired up in `main`. All
 `App` needs to know is the API of the handlers it's *directly* invoking.
 
-## Conclusion
+#### Conclusion
 
 I hope I convinced you that routers *in and off itself* are harmful. Pulling
 the routing into one component means that that component needs to encapsulate

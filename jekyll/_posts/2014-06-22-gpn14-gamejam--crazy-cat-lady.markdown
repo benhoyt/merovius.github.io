@@ -1,6 +1,8 @@
 ---
 layout: post
 title: "GPN14 GameJam - Crazy cat lady"
+tldr: "We made a gamejam-game."
+tags: ["programming"]
 date: 2014-06-22 13:45:28
 ---
 **tl:dr: We made a [gamejam-game](https://entropia.de/GPN14:GameJam:CrazyCatLady)**
