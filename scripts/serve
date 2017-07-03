@@ -10,4 +10,4 @@ exec sudo docker run -i -t \
 				-p 4000:4000 \
 				-w /src/jekyll \
 				${IMAGE} \
-				jekyll serve --destination /tmp/_site --watch --drafts
+				jekyll serve --host 0.0.0.0 --destination /tmp/_site --watch --drafts
