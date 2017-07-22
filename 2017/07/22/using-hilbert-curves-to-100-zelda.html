@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Using Hilbert Curves to 100% Zelda</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
+
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="games,math,programming,zelda">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
+
+    <main class="container">
+      <h3>Using Hilbert Curves to 100% Zelda</h3>
+<p>2017-07-22</p>
+
+<article>
+<p><strong>tl;dr: I used Hilbert Curves to make it quicker to walk through a list of locations on a map, so I could could fully complete a video game.</strong></p>
+
+<p>As you probably know recently the question of what <a href="https://s-media-cache-ak0.pinimg.com/originals/eb/31/e5/eb31e5c0a14d4a68ab8d492e848de608.jpg">the best Zelda
+Game</a>
+is was finally settled by Breath Of The Wild. Like most people I know I ended
+up playing. And to keep me engaged I early on decided that I would get as close
+as possible to 100% of the game before finishing it. That is I wanted to finish
+all shrines, find all Korok Seeds, max out all armor and do all quests before
+killing Ganon. I recently finished that and finally killed Ganon. Predictably,
+I was in for a disappointment:</p>
+
+<p><img src="//blog.merovius.de//assets/botw_9859.jpg" alt="98.59%"></p>
+
+<p>98.59 percent! I did expect that though. The reason is that only certain things
+count into the percentage as displayed; Korok Seeds are one of them, Shrines
+are another. But it also counts landmarks and locations as shown on the map.
+Each contributes 1/12% to the total.</p>
+
+<p>So I started on the onerous task of finding the last 17 locations. I&#39;m not
+above using help for that so I carefully scrolled through <a href="https://www.zeldadungeon.net/breath-of-the-wild-interactive-map">an online
+map</a> of the
+BotW universe, maticulously comparing the locations on it with the ones already
+on my in-game map. Anything I haven&#39;t visited was marked and visited. But that
+only put me to 99.58%; I was still missing 5 locations. apparently I didn&#39;t
+compare carefully enough.</p>
+
+<p>I needed a more systematic approach. I started to instead go through an
+<a href="http://www.ign.com/wikis/the-legend-of-zelda-breath-of-the-wild/Locations_by_Region">alphabetical list of
+locations</a>,
+looking up each on the map and see if I already had it mapped. But that got old
+<em>really</em> quickly. Alphabetical just wasn&#39;t a great way to organize these; I
+wanted a list that I could systematically check. But I didn&#39;t want it
+alphabetically but geographically. I didn&#39;t want to have to jump around the map
+to try and find the next one. Which is when I realized that this would be the
+perfect application for a <a href="https://en.wikipedia.org/wiki/Hilbert_curve">Hilbert curve</a>.</p>
+
+<p>If you don&#39;t know (though you should really just read the Wikipedia Article),
+the Hilbert curve is a space filling fractal curve, that is a continuous
+bijective map from the real number line to the plane. It is iteratively
+defined as the limit of finite curves that get denser and denser. One of the
+most interesting properties of the curve and its finite approximations is that
+points that are close on the real number line get mapped to points that are
+close in the plane. So if we could extract all locations from the online map,
+figure out for each what real number gets mapped to that point and order the
+locations by those numbers, we&#39;d get a list of locations where neighbors in the
+list are close to each other on the map. Presumably, that
+would make for easy checking of the list: The next location should be pretty
+much neighbouring the previous one and if I can&#39;t find a location nearby,
+chances are that I didn&#39;t visit it yet (and I can then look it up specifically).</p>
+
+<p>The first step for this was to get a list of locations and their corresponding
+positions. I was pretty sure that the online map should have that available
+somehow, as it uses some Google Maps framework to draw the map. So I
+looked at the network tab of the Chrome developer tools, found the URL that
+loaded the landmark data, copied the request as curl and saved the output for
+further massaging.</p>
+
+<p><img src="//blog.merovius.de//assets/botw_curl.jpg" alt="Chrome developer tools - copy as cURL"></p>
+
+<p>The returned file turns out to not actually be JSON (that&#39;d be too easy, I
+guess) but some kind of javascript-code which is then probably eventually
+eval&#39;d to get the data:</p>
+<div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>/**/jQuery31106443585752152035_1500757689075(/* json-data */)
+</code></pre></div>
+<p>I just removed everything but the actual JSON with my editor and ran it through
+a pretty-printer, to get at it&#39;s actual structure. I spare you the details; it
+turns out the list of locations isn&#39;t even simply contained in that it&#39;s
+embedded as another string, with HTML tags, as a property (twice!).</p>
+
+<p>So I quickly hacked together some go code to dissect the data and voilà: Got a
+list of location names with the corresponding positions:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">data</span> <span class="kd">struct</span> <span class="p">{</span>
+        <span class="nx">Parse</span> <span class="kd">struct</span> <span class="p">{</span>
+            <span class="nx">Properties</span> <span class="p">[]</span><span class="kd">struct</span> <span class="p">{</span>
+                <span class="nx">Name</span>    <span class="kt">string</span> <span class="s">`json:&quot;name&quot;`</span>
+                <span class="nx">Content</span> <span class="kt">string</span> <span class="s">`json:&quot;*&quot;`</span>
+            <span class="p">}</span> <span class="s">`json:&quot;properties&quot;`</span>
+        <span class="p">}</span> <span class="s">`json:&quot;parse&quot;`</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">NewDecoder</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stdin</span><span class="p">).</span><span class="nx">Decode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">data</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nx">content</span> <span class="kt">string</span>
+
+    <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">p</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">data</span><span class="p">.</span><span class="nx">Parse</span><span class="p">.</span><span class="nx">Properties</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">p</span><span class="p">.</span><span class="nx">Name</span> <span class="o">==</span> <span class="s">&quot;description&quot;</span> <span class="p">{</span>
+            <span class="nx">content</span> <span class="p">=</span> <span class="nx">p</span><span class="p">.</span><span class="nx">Content</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="nx">content</span> <span class="o">==</span> <span class="s">&quot;&quot;</span> <span class="p">{</span>
+        <span class="nb">panic</span><span class="p">(</span><span class="s">&quot;no content&quot;</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nx">landmarks</span> <span class="p">[]</span><span class="kd">struct</span> <span class="p">{</span>
+        <span class="nx">Type</span>     <span class="kt">string</span>
+        <span class="nx">Geometry</span> <span class="kd">struct</span> <span class="p">{</span>
+            <span class="nx">Type</span>        <span class="kt">string</span>
+            <span class="nx">Coordinates</span> <span class="p">[]</span><span class="kt">float64</span>
+        <span class="p">}</span>
+        <span class="nx">Properties</span> <span class="kd">struct</span> <span class="p">{</span>
+            <span class="nx">Type</span> <span class="kt">string</span>
+            <span class="nx">Id</span>   <span class="kt">string</span>
+            <span class="nx">Name</span> <span class="kt">string</span>
+            <span class="nx">Link</span> <span class="kt">string</span>
+            <span class="nx">Src</span>  <span class="kt">string</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">json</span><span class="p">.</span><span class="nx">NewDecoder</span><span class="p">(</span><span class="nx">arrayReader</span><span class="p">(</span><span class="nx">content</span><span class="p">)).</span><span class="nx">Decode</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">landmarks</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">m</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">landmarks</span> <span class="p">{</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;%s: %v\n&quot;</span><span class="p">,</span> <span class="nx">m</span><span class="p">.</span><span class="nx">Properties</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="nx">m</span><span class="p">.</span><span class="nx">Geometry</span><span class="p">.</span><span class="nx">Coordinates</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">arrayReader</span><span class="p">(</span><span class="nx">s</span> <span class="kt">string</span><span class="p">)</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span> <span class="p">{</span>
+    <span class="nx">s</span> <span class="p">=</span> <span class="nx">strings</span><span class="p">.</span><span class="nx">TrimSuffix</span><span class="p">(</span><span class="nx">strings</span><span class="p">.</span><span class="nx">TrimSpace</span><span class="p">(</span><span class="nx">s</span><span class="p">),</span> <span class="s">&quot;,&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">io</span><span class="p">.</span><span class="nx">MultiReader</span><span class="p">(</span><span class="nx">strings</span><span class="p">.</span><span class="nx">NewReader</span><span class="p">(</span><span class="s">&quot;[&quot;</span><span class="p">),</span> <span class="nx">strings</span><span class="p">.</span><span class="nx">NewReader</span><span class="p">(</span><span class="nx">s</span><span class="p">),</span> <span class="nx">strings</span><span class="p">.</span><span class="nx">NewReader</span><span class="p">(</span><span class="s">&quot;]&quot;</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This bode well. Now all I needed to do was to calculate the Hilbert Curve
+coordinate for each of them and I&#39;d have what I need. The Wikipedia Article
+helpfully contains an
+<a href="https://en.wikipedia.org/wiki/Hilbert_curve#Applications_and_mapping_algorithms">implementation</a>
+of the corresponding algorithm in C. <code>xy2d</code> assumes a discrete grid of n² cells
+and returns an integer preimage of the given coordinates. The coordinates we have
+are all floating point numbers between 0 and 2 (ish) with 5 significant digits.
+I figured that 65536 should be able to represent the granularity of points well
+enough, so I chose that as an n, ported the code to go, sorted the locations
+accordingly and it <em>actually worked</em>!</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="c1">// Same stuff as before</span>
+
+    <span class="nx">sort</span><span class="p">.</span><span class="nx">Slice</span><span class="p">(</span><span class="nx">landmarks</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">j</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+        <span class="nx">xi</span> <span class="o">:=</span> <span class="nx">f2d</span><span class="p">(</span><span class="nx">landmarks</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">Geometry</span><span class="p">.</span><span class="nx">Coordinates</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="nx">yi</span> <span class="o">:=</span> <span class="nx">f2d</span><span class="p">(</span><span class="nx">landmarks</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">Geometry</span><span class="p">.</span><span class="nx">Coordinates</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="nx">xj</span> <span class="o">:=</span> <span class="nx">f2d</span><span class="p">(</span><span class="nx">landmarks</span><span class="p">[</span><span class="nx">j</span><span class="p">].</span><span class="nx">Geometry</span><span class="p">.</span><span class="nx">Coordinates</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="nx">yj</span> <span class="o">:=</span> <span class="nx">f2d</span><span class="p">(</span><span class="nx">landmarks</span><span class="p">[</span><span class="nx">j</span><span class="p">].</span><span class="nx">Geometry</span><span class="p">.</span><span class="nx">Coordinates</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="nx">di</span> <span class="o">:=</span> <span class="nx">xy2d</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">16</span><span class="p">,</span> <span class="nx">xi</span><span class="p">,</span> <span class="nx">yi</span><span class="p">)</span>
+        <span class="nx">dj</span> <span class="o">:=</span> <span class="nx">xy2d</span><span class="p">(</span><span class="mi">1</span><span class="o">&lt;&lt;</span><span class="mi">16</span><span class="p">,</span> <span class="nx">xj</span><span class="p">,</span> <span class="nx">yj</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nx">di</span> <span class="p">&lt;</span> <span class="nx">dj</span>
+    <span class="p">})</span>
+
+    <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">m</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">landmarks</span> <span class="p">{</span>
+        <span class="nx">fmt</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;%s: %v\n&quot;</span><span class="p">,</span> <span class="nx">m</span><span class="p">.</span><span class="nx">Properties</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="nx">m</span><span class="p">.</span><span class="nx">Geometry</span><span class="p">.</span><span class="nx">Coordinates</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">xy2d</span><span class="p">(</span><span class="nx">n</span><span class="p">,</span> <span class="nx">x</span><span class="p">,</span> <span class="nx">y</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">int</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">d</span> <span class="kt">int</span>
+    <span class="k">for</span> <span class="nx">s</span> <span class="o">:=</span> <span class="nx">n</span> <span class="o">/</span> <span class="mi">2</span><span class="p">;</span> <span class="nx">s</span> <span class="p">&gt;</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">s</span> <span class="p">=</span> <span class="nx">s</span> <span class="o">/</span> <span class="mi">2</span> <span class="p">{</span>
+        <span class="kd">var</span> <span class="nx">rx</span><span class="p">,</span> <span class="nx">ry</span> <span class="kt">int</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nx">x</span> <span class="o">&amp;</span> <span class="nx">s</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+            <span class="nx">rx</span> <span class="p">=</span> <span class="mi">1</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nx">y</span> <span class="o">&amp;</span> <span class="nx">s</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+            <span class="nx">ry</span> <span class="p">=</span> <span class="mi">1</span>
+        <span class="p">}</span>
+        <span class="nx">d</span> <span class="o">+=</span> <span class="nx">s</span> <span class="o">*</span> <span class="nx">s</span> <span class="o">*</span> <span class="p">((</span><span class="mi">3</span> <span class="o">*</span> <span class="nx">rx</span><span class="p">)</span> <span class="p">^</span> <span class="nx">ry</span><span class="p">)</span>
+        <span class="nx">x</span><span class="p">,</span> <span class="nx">y</span> <span class="p">=</span> <span class="nx">rot</span><span class="p">(</span><span class="nx">s</span><span class="p">,</span> <span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">rx</span><span class="p">,</span> <span class="nx">ry</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">d</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">rot</span><span class="p">(</span><span class="nx">n</span><span class="p">,</span> <span class="nx">x</span><span class="p">,</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">rx</span><span class="p">,</span> <span class="nx">ry</span> <span class="kt">int</span><span class="p">)</span> <span class="p">(</span><span class="kt">int</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">ry</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">ry</span> <span class="o">==</span> <span class="mi">1</span> <span class="p">{</span>
+            <span class="nx">x</span> <span class="p">=</span> <span class="nx">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="nx">x</span>
+            <span class="nx">y</span> <span class="p">=</span> <span class="nx">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="nx">y</span>
+        <span class="p">}</span>
+        <span class="nx">x</span><span class="p">,</span> <span class="nx">y</span> <span class="p">=</span> <span class="nx">y</span><span class="p">,</span> <span class="nx">x</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">x</span><span class="p">,</span> <span class="nx">y</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">f2d</span><span class="p">(</span><span class="nx">f</span> <span class="kt">float64</span><span class="p">)</span> <span class="kt">int</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">15</span><span class="p">)</span> <span class="o">*</span> <span class="nx">f</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>In the end, there was still a surprising amount of jumping around involved. I
+don&#39;t know whether that&#39;s accidental (i.e. due to my code being wrong) or
+inherent (that is the Hilbert curve just can&#39;t map this perfectly well). I
+assume it&#39;s a bit of both. The list also contains the same landmark multiple
+times. This is because things like big lakes or plains where marked multiple
+times. It would be trivial to filter duplicates but I actually found them
+reasonably helpfull when having to jump around.</p>
+
+<p>There might also be better approaches than Hilbert Curves. For example, we
+could view it as an instance of the <a href="https://en.wikipedia.org/wiki/Travelling_salesman_problem">Traveling Salesman
+Problem</a> with a
+couple of hundred points; it should be possible to have a good heuristic
+solution for that. On the other hand, a TSP solution doesn&#39;t necessarily only
+have short jumps, so it <em>might</em> not be that good?</p>
+
+<p>In any case, this approach was definitely good enough for me and it&#39;s probably
+the nerdiest thing I ever did :)</p>
+
+<p><img src="//blog.merovius.de//assets/botw_1000.jpg" alt="100%"></p>
+
+</article>
+
+    </main>
+
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
+        </div>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
+</html>
