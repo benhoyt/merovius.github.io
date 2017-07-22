@@ -1,5 +1,6 @@
 name: Between a rock and a crazy place
 url: //blog.merovius.de/
+future: true
 
 markdown: redcarpet
 highlighter: pygments
