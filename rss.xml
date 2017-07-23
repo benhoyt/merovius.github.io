@@ -66,6 +66,41 @@ would make for easy checking of the list: The next location should be pretty
 much neighbouring the previous one and if I can't find a location nearby,
 chances are that I didn't visit it yet (and I can then look it up specifically).
 
+**\[edit\] Commentors on
+[reddit](https://www.reddit.com/r/programming/comments/6oxra8/using_hilbert_curves_to_100_zelda/dklhina/)
+and [Hacker news](https://news.ycombinator.com/item?id=14830691) have pointed
+out correctly, that all curves satisfy the property that near point on the line
+map to near points on the plane. What makes the Hilbert Curve special, is that
+we work on finite approximations and with the Hilbert Curve, we don't have to
+worry about the "correct" level of discrete approximation.**
+
+**To see what that means, we can look at a zig-zag curve. Say, we split our map
+into a 100000x100000 grid and move in a zig-zag, left-to-right, top-to-bottom.
+Given how sparse our point-set is, this would mean that most of the rows are
+empty and some of them would have only one point on them. So we wozuld have to
+constantly move along the entire width of the map. On the other hand, if we
+split it into a 2x2 grid, it wouldn't be very helpful; a lot of points would
+end up in the same quadrant, which would be very large, so we wouldn't have won
+anything. So there would have to be some fineness of the grid that's "just
+right" somewhere in the middle, which we'd need to find.**
+
+**On the other hand with Hilbert Curves, this isn't a problem. That's because the
+*limit* of the finite approximations is continuous (which isn't the case with
+the limit of zig-zag curves). What that means, in essence, is that where a
+point falls on the curve won't jump around a lot when we make our grid finer,
+it will "home in" to its final location on the continuous curve. A first order
+Hilbert Curve is just a zig-zag curve, so it has the same problem as the
+2x2-grid zig-zag line. But as we increase it's order, the points will just
+become more and more local, instead of requiring scanning empty space. That is
+the interesting consequence of the Hilbert curve being space-filling.**
+
+**Really, [this video](https://www.youtube.com/watch?v=3s7h2MHQtxc) explains it
+much better than I ever could (even though I find the example given there
+slightly ridiculous). In the end, I mostly agree with the commentors; it
+probably wouldn't have been too hard to find a good approximation that would
+make a zig-zag curve work well. But I had Hilbert Curves ready anyway and
+appreciated the opportunity to usue them.\[/edit\]**
+
 The first step for this was to get a list of locations and their corresponding
 positions. I was pretty sure that the online map should have that available
 somehow, as it uses some Google Maps framework to draw the map. So I
@@ -77,7 +112,10 @@ further massaging.
 
 The returned file turns out to not actually be JSON (that'd be too easy, I
 guess) but some kind of javascript-code which is then probably eventually
-eval'd to get the data:
+eval'd to get the data (**edit: It has been pointed out, that this is just
+[JSONP](https://en.wikipedia.org/wiki/JSONP). I was aware that this is probably
+the case, but didn't feel comfortable using the term, as I don't know enough
+about it. I also didn't consider it very important**) :
 
 ```
 /**/jQuery31106443585752152035_1500757689075(/* json-data */)

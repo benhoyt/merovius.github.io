@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="http://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="//blog.merovius.de//atom.xml"/>
-  <updated>2017-07-22T22:04:42+00:00</updated>
+  <updated>2017-07-23T07:57:16+00:00</updated>
   <id>//blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -66,6 +66,41 @@ would make for easy checking of the list: The next location should be pretty
 much neighbouring the previous one and if I can&amp;#39;t find a location nearby,
 chances are that I didn&amp;#39;t visit it yet (and I can then look it up specifically).&lt;/p&gt;
 
+&lt;p&gt;&lt;strong&gt;[edit] Commentors on
+&lt;a href=&quot;https://www.reddit.com/r/programming/comments/6oxra8/using_hilbert_curves_to_100_zelda/dklhina/&quot;&gt;reddit&lt;/a&gt;
+and &lt;a href=&quot;https://news.ycombinator.com/item?id=14830691&quot;&gt;Hacker news&lt;/a&gt; have pointed
+out correctly, that all curves satisfy the property that near point on the line
+map to near points on the plane. What makes the Hilbert Curve special, is that
+we work on finite approximations and with the Hilbert Curve, we don&amp;#39;t have to
+worry about the &amp;quot;correct&amp;quot; level of discrete approximation.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;To see what that means, we can look at a zig-zag curve. Say, we split our map
+into a 100000x100000 grid and move in a zig-zag, left-to-right, top-to-bottom.
+Given how sparse our point-set is, this would mean that most of the rows are
+empty and some of them would have only one point on them. So we wozuld have to
+constantly move along the entire width of the map. On the other hand, if we
+split it into a 2x2 grid, it wouldn&amp;#39;t be very helpful; a lot of points would
+end up in the same quadrant, which would be very large, so we wouldn&amp;#39;t have won
+anything. So there would have to be some fineness of the grid that&amp;#39;s &amp;quot;just
+right&amp;quot; somewhere in the middle, which we&amp;#39;d need to find.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;On the other hand with Hilbert Curves, this isn&amp;#39;t a problem. That&amp;#39;s because the
+&lt;em&gt;limit&lt;/em&gt; of the finite approximations is continuous (which isn&amp;#39;t the case with
+the limit of zig-zag curves). What that means, in essence, is that where a
+point falls on the curve won&amp;#39;t jump around a lot when we make our grid finer,
+it will &amp;quot;home in&amp;quot; to its final location on the continuous curve. A first order
+Hilbert Curve is just a zig-zag curve, so it has the same problem as the
+2x2-grid zig-zag line. But as we increase it&amp;#39;s order, the points will just
+become more and more local, instead of requiring scanning empty space. That is
+the interesting consequence of the Hilbert curve being space-filling.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Really, &lt;a href=&quot;https://www.youtube.com/watch?v=3s7h2MHQtxc&quot;&gt;this video&lt;/a&gt; explains it
+much better than I ever could (even though I find the example given there
+slightly ridiculous). In the end, I mostly agree with the commentors; it
+probably wouldn&amp;#39;t have been too hard to find a good approximation that would
+make a zig-zag curve work well. But I had Hilbert Curves ready anyway and
+appreciated the opportunity to usue them.[/edit]&lt;/strong&gt;&lt;/p&gt;
+
 &lt;p&gt;The first step for this was to get a list of locations and their corresponding
 positions. I was pretty sure that the online map should have that available
 somehow, as it uses some Google Maps framework to draw the map. So I
@@ -77,7 +112,10 @@ further massaging.&lt;/p&gt;
 
 &lt;p&gt;The returned file turns out to not actually be JSON (that&amp;#39;d be too easy, I
 guess) but some kind of javascript-code which is then probably eventually
-eval&amp;#39;d to get the data:&lt;/p&gt;
+eval&amp;#39;d to get the data (&lt;strong&gt;edit: It has been pointed out, that this is just
+&lt;a href=&quot;https://en.wikipedia.org/wiki/JSONP&quot;&gt;JSONP&lt;/a&gt;. I was aware that this is probably
+the case, but didn&amp;#39;t feel comfortable using the term, as I don&amp;#39;t know enough
+about it. I also didn&amp;#39;t consider it very important&lt;/strong&gt;) :&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;&lt;span&gt;&lt;/span&gt;/**/jQuery31106443585752152035_1500757689075(/* json-data */)
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;I just removed everything but the actual JSON with my editor and ran it through
