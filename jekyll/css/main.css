@@ -42,4 +42,13 @@ footer {
 img {
   margin: 1em 10%;
   width: 80%;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.16),
+              0 3px 6px rgba(0,0,0,0.23);
 }
+
+pre {
+  padding: 1em;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.16),
+              0 3px 6px rgba(0,0,0,0.23);
+}
+
