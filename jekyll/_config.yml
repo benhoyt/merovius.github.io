@@ -15,3 +15,6 @@ sitemap:
         - 'impressum.html'
         - 'google59e5fe5f31947a20.html'
         - 'robots.txt'
+
+redcarpet:
+    extensions: ["with_toc_data"]
