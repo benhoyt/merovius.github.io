@@ -62,7 +62,7 @@ talk about in a meaningful way and must be dealt with separately anyway.
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:</p>
 
-<h4>Adding func/type/var/const at package scope</h4>
+<h4 id="adding-func-type-var-const-at-package-scope">Adding func/type/var/const at package scope</h4>
 
 <p>This is the only thing that seems to be fine under the stability guarantee.  It
 turns out the go authors thought about this one and put the exception of
@@ -80,23 +80,23 @@ to use a separate <code>foo_test</code> package for your tests to break dependen
 In that case it is widely deemed acceptable to <code>. import &quot;foo&quot;</code> to save typing
 and add clarity.</p>
 
-<h4>Removing func/type/var/const at package scope</h4>
+<h4 id="removing-func-type-var-const-at-package-scope">Removing func/type/var/const at package scope</h4>
 
 <p>Downstream might use the removed function/type/variable/constant, so this is
 obviously a breaking change.</p>
 
-<h4>Adding a method to an interface</h4>
+<h4 id="adding-a-method-to-an-interface">Adding a method to an interface</h4>
 
 <p>Downstream might want to create an implementation of your interface and try to
 pass it. After you add a method, this type doesn&#39;t implement your interface
 anymore and downstreams code will break.</p>
 
-<h4>Removing a method from an interface</h4>
+<h4 id="removing-a-method-from-an-interface">Removing a method from an interface</h4>
 
 <p>Downstream might want to call this method on a value of your interface type, so
 this is obviously a breaking change.</p>
 
-<h4>Adding a field to a struct</h4>
+<h4 id="adding-a-field-to-a-struct">Adding a field to a struct</h4>
 
 <p>This is perhaps surprising, but adding a field to a struct is a breaking
 change. The reason is, that downstream might embed two types into a struct. If
@@ -152,20 +152,20 @@ to write the selector and wrap every embedded method anyway.</p>
 <p>I hope we all agree that type embedding is awesome and shouldn&#39;t need to be
 avoided :)</p>
 
-<h4>Removing a field from a struct</h4>
+<h4 id="removing-a-field-from-a-struct">Removing a field from a struct</h4>
 
 <p>Downstream might use the now removed field, so this is obviously a breaking change.</p>
 
-<h4>Adding a method to a type</h4>
+<h4 id="adding-a-method-to-a-type">Adding a method to a type</h4>
 
 <p>The argument is pretty much the same as adding a field to a struct: Downstream
 might embed your type and suddenly get ambiguities.</p>
 
-<h4>Removing a method from a type</h4>
+<h4 id="removing-a-method-from-a-type">Removing a method from a type</h4>
 
 <p>Downstream might call the now removed method, so this is obviously a breaking change.</p>
 
-<h4>Changing a function/method signature</h4>
+<h4 id="changing-a-function-method-signature">Changing a function/method signature</h4>
 
 <p>Most changes are obviously breaking. But as it turns out you can&#39;t do <em>any</em>
 change to a function or method signature. This includes adding a variadic
@@ -175,7 +175,7 @@ call site will still be correct, right?</p>
 <p>The reason is, that downstream might save your function or method in a variable
 of the old type, which will break because of nonassignable types.</p>
 
-<h4>Conclusion</h4>
+<h4 id="conclusion">Conclusion</h4>
 
 <p>It looks to me like anything that isn&#39;t just adding a new Identifier to the
 package-scope will potentially break <em>some</em> downstream. This severely limits

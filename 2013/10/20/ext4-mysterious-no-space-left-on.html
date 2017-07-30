@@ -45,7 +45,7 @@ that&#39;s a different story). But there actually was plenty of space left.</p>
 ever get this error message (using ext4) you should probably check these four
 things (my issue was the last one):</p>
 
-<h4>Do you <em>actually</em> have enough space?</h4>
+<h4 id="do-you-actually-have-enough-space">Do you <em>actually</em> have enough space?</h4>
 
 <p>Use <code>df -h</code>. There is actually a very common pitfall with ext4. Let&#39;s have a look:</p>
 <div class="highlight"><pre><code class="language-text" data-lang="text"><span></span>mero@rincewind ~$ df -h
@@ -68,7 +68,7 @@ Reserved block count:     2499541
 Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
 </code></pre></div>
-<h4>Do you have too many files?</h4>
+<h4 id="do-you-have-too-many-files">Do you have too many files?</h4>
 
 <p>Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
@@ -81,7 +81,7 @@ it is limited. Checking this is easy: Just use <code>df -i</code>:</p>
 column near 100, you probably want to delete some old files (and you should
 <em>definitely</em> question, how so many files could be created to begin with).</p>
 
-<h4>Do a file system check</h4>
+<h4 id="do-a-file-system-check">Do a file system check</h4>
 
 <p>At least some people on the internet say, that something like this has
 happened to them after a crash (coincidentally my system crashed before the
@@ -90,7 +90,7 @@ check got rid of it. So you probably want to run <code>fsck -f &lt;path_to_your_
 to run such a check. You probably also want to do that from a live-system, if
 you cannot unmount it (for example if it&#39;s mounted at the root-dir).</p>
 
-<h4>Do you have <code>dir_index</code> enabled?</h4>
+<h4 id="do-you-have-dir_index-enabled">Do you have <code>dir_index</code> enabled?</h4>
 
 <p>So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does

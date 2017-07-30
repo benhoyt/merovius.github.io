@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>The trouble with optional interfaces</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
+
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
+
+    <main class="container">
+      <h3>The trouble with optional interfaces</h3>
+<p>2017-07-30</p>
+
+<article>
+<p><strong>tl;dr: I take a look at the pattern of optional interfaces in Go: what they
+are used for, why they are bad and what we can do about it.</strong></p>
+
+<p><em>Note: I wrote most of this article on Wednesday, with the intention to finish
+and publish it on the weekend. While I was sleeping, Jack Lindamood published
+<a href="https://medium.com/@cep21/interface-wrapping-method-erasure-c523b3549912">this
+post</a>,
+which talks about much of the same problems.
+<a href="https://twitter.com/TheMerovius/status/890472264931708928">This</a> was the exact
+moment I saw that post :) I decided, to publish this anyway; it contains, in my
+opinion, enough additional content, to be worth it. But I do encourage to
+(also?) read his post.</em></p>
+
+<h4 id="what-are-optional-interfaces">What are optional interfaces?</h4>
+
+<p>Optional interfaces are interfaces which can optionally be extended by
+implementing some other interface. A good example is
+<a href="http://godoc.org/net/http#Pusher">http.Flusher</a> (and similar), which is
+optionally implemented by an
+<a href="http://godoc.org/net/http#ResponseWriter">http.ResponseWriter</a>. If a request
+comes in via HTTP/2, the ResponseWriter will implement this interface to
+support <a href="https://en.wikipedia.org/wiki/HTTP/2_Server_Push">HTTP/2 Server Push</a>.
+But as not all requests will be over HTTP/2, this isn&#39;t part of the normal
+ResponseWriter interface and instead provided via an optional interface that
+needs to be type-asserted at runtime.</p>
+
+<p>In general, whenever some piece of code is doing a type-assertion with an
+interface type (that is, use an expression <code>v.(T)</code>, where <code>T</code> is an interface
+type), it is very likely offering an optional interface.</p>
+
+<p>A far from exhaustive list of where the optional interface pattern is used (to
+roughly illustrate the scope of the pattern):</p>
+
+<ul>
+<li><a href="http://godoc.org/io#Copy">io</a></li>
+<li><a href="http://godoc.org/net/http#ResponseWriter#Flusher">net/http</a></li>
+<li><a href="http://godoc.org/database/sql/driver#ConnBeginTx">database/sql/driver</a></li>
+<li><a href="http://godoc.org/go/types#Importer">go/types</a></li>
+<li>Dave Chaney&#39;s <a href="http://godoc.org/github.com/pkg/errors#Cause">errors package</a></li>
+</ul>
+
+<h4 id="what-are-people-using-them-for">What are people using them for?</h4>
+
+<p>There are multiple reasons to use optional interfaces. Let&#39;s find examples for
+them. Note that this list neither claims to be exhaustive (there are probably
+use cases I don&#39;t know about) nor disjunct (in some cases, optional interfaces
+will carry more than one of these use cases). But I think it&#39;s a good rough
+partition to discuss.</p>
+
+<h5 id="passing-behavior-through-api-boundaries">Passing behavior through API boundaries</h5>
+
+<p>This is the case of <code>ResponseWriter</code> and its optional interfaces. The API, in
+this case, is the <code>http.Handler</code> interface that users of the package implement
+and that the package accepts. As features like HTTP/2 Push or connection
+hijacking are not available to all connections, this interface needs to use the
+lowest common denominator between all possible behaviors. So, if more features
+need to be supported, we must somehow be able to pass this optional behavior
+through the <code>http.Handler</code> interface.</p>
+
+<h5 id="enabling-optional-optimizations-features">Enabling optional optimizations/features</h5>
+
+<p><a href="http://godoc.org/io#Copy">io.Copy</a> serves as a good example of this. The
+required interfaces for it to work are just <code>io.Reader</code> and <code>io.Writer</code>. But it
+can be made more efficient, if the passed values also implement <code>io.WriterTo</code>
+or <code>io.ReaderFrom</code>, respectively. For example, a
+<a href="http://godoc.org/bytes#Reader.WriteTo">bytes.Reader</a> implements <code>WriteTo</code>.
+This means, you need less copying if the source of an <code>io.Copy</code> is a
+<code>bytes.Reader</code>. Compare these two (somewhat naive) implementations:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Copy</span><span class="p">(</span><span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span><span class="p">,</span> <span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="p">(</span><span class="nx">n</span> <span class="kt">int64</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">buf</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+    <span class="k">for</span> <span class="p">{</span>
+        <span class="nx">rn</span><span class="p">,</span> <span class="nx">rerr</span> <span class="o">:=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Read</span><span class="p">(</span><span class="nx">buf</span><span class="p">)</span>
+        <span class="nx">wn</span><span class="p">,</span> <span class="nx">werr</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">Write</span><span class="p">(</span><span class="nx">buf</span><span class="p">[:</span><span class="nx">rn</span><span class="p">])</span>
+        <span class="nx">n</span> <span class="o">+=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">wn</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nx">rerr</span> <span class="o">==</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nx">n</span><span class="p">,</span> <span class="kc">nil</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="nx">rerr</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nx">n</span><span class="p">,</span> <span class="nx">rerr</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="nx">werr</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nx">n</span><span class="p">,</span> <span class="nx">werr</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">CopyTo</span><span class="p">(</span><span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span><span class="p">,</span> <span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">WriterTo</span><span class="p">)</span> <span class="p">(</span><span class="nx">n</span> <span class="kt">int64</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">r</span><span class="p">.</span><span class="nx">WriteTo</span><span class="p">(</span><span class="nx">w</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">Reader</span> <span class="p">[]</span><span class="kt">byte</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">Reader</span><span class="p">)</span> <span class="nx">Read</span><span class="p">(</span><span class="nx">b</span> <span class="p">[]</span><span class="kt">byte</span><span class="p">)</span> <span class="p">(</span><span class="nx">n</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">n</span> <span class="p">=</span> <span class="nb">copy</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="o">*</span><span class="nx">r</span><span class="p">)</span>
+    <span class="o">*</span><span class="nx">r</span> <span class="p">=</span> <span class="p">(</span><span class="o">*</span><span class="nx">r</span><span class="p">)[</span><span class="nx">n</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="nx">n</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+        <span class="nx">err</span> <span class="p">=</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">n</span><span class="p">,</span> <span class="nx">err</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">Reader</span><span class="p">)</span> <span class="nx">WriteTo</span><span class="p">(</span><span class="nx">w</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span><span class="p">)</span> <span class="p">(</span><span class="kt">int64</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">n</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">w</span><span class="p">.</span><span class="nx">Write</span><span class="p">(</span><span class="o">*</span><span class="nx">r</span><span class="p">)</span>
+    <span class="o">*</span><span class="nx">r</span> <span class="p">=</span> <span class="p">(</span><span class="o">*</span><span class="nx">r</span><span class="p">)[</span><span class="nx">n</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">n</span><span class="p">),</span> <span class="nx">err</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>Copy</code> needs to first allocate a buffer, then copy all the data from the
+<code>*Reader</code> to that buffer, then pass it to the Writer. <code>CopyTo</code>, on the other
+hand, can directly pass the byte-slice to the Writer, saving an allocation and
+a copy.</p>
+
+<p>Some of that cost can be amortized, but in general, its existence is a forced
+consequence of the API. By using optional interfaces, <code>io.Copy</code> can use the
+more efficient method, if supported, and fall back to the slow method, if not.</p>
+
+<h5 id="backwards-compatible-api-changes">Backwards compatible API changes</h5>
+
+<p>When <code>database/sql</code> upgraded to use <code>context</code>, it needed help from the drivers
+to actually implement cancellation and the like. So it needed to add contexts
+to the methods of <a href="http://godoc.org/database/sql/driver#Conn">driver.Conn</a>. But
+it can&#39;t just do that change; it would be a backwards incompatible API change,
+violating the Go1 compatibility guarantee. It also can&#39;t add a new method to
+the interface to be used, as there are third-party implementations for drivers,
+which would be broken as they don&#39;t implement the new method.</p>
+
+<p>So it instead resorted to
+<a href="https://golang.org/src/database/sql/driver/driver.go#L159">deprecate</a> the old
+methods and instead encourage driver implementers to add optional methods
+including the context.</p>
+
+<h4 id="why-are-they-bad">Why are they bad?</h4>
+
+<p>There are several problems with using optional interfaces. Some of them have
+workarounds (see below), but all of them have drawbacks on their own.</p>
+
+<h5 id="they-violate-static-type-safety">They violate static type safety</h5>
+
+<p>In a lot of cases, the consumer of an optional interface can&#39;t really treat it
+as optional. For example, <code>http.Hijacker</code> is usually used to support
+WebSockets. A handler for WebSockets will, in general, not be able to do
+anything useful, when called with a <code>ResponseWriter</code> that does not implement
+<code>Hijacker</code>. Even when it correctly does a comma-ok type assertion to check
+for it, it can&#39;t do anything but serve an error in that case.</p>
+
+<p>The http.Hijacker type conveys the necessity of hijacking a connection, but
+since it is provided as an optional interface, there is no possibility to
+require this type statically. In that way, optional interfaces hide static type
+information.</p>
+
+<h5 id="they-remove-a-lot-of-the-power-of-interfaces">They remove a lot of the power of interfaces</h5>
+
+<p>Go&#39;s interfaces are really powerful by being very small; in general, the
+advice is to only add one method, maybe a small handful. This advice enables
+easy and powerful composition. <code>io.Reader</code> and <code>io.Writer</code> have a myriad of
+implementations inside and outside of the standard library. This makes it
+really easy to, say, read uncompressed data from a compressed network
+connection, while streaming it to a file and hashing it at the same time to
+write to some content-addressed blob storage.</p>
+
+<p>Now, this composition will, in general, destroy any optional interfaces of
+those values. Say, we have an HTTP middleware to log requests. It wants to wrap
+an <code>http.Handler</code> and log the requests method, path, response code and duration
+(or, equivalently, collect them as metrics to export). This is, in principle,
+easy to do:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">logResponder</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span>
+    <span class="nx">code</span> <span class="kt">int</span>
+    <span class="nx">set</span> <span class="kt">bool</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">rw</span> <span class="o">*</span><span class="nx">logResponder</span><span class="p">)</span> <span class="nx">WriteHeader</span><span class="p">(</span><span class="nx">code</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">rw</span><span class="p">.</span><span class="nx">code</span> <span class="p">=</span> <span class="nx">code</span>
+    <span class="nx">rw</span><span class="p">.</span><span class="nx">set</span> <span class="p">=</span> <span class="kt">bool</span>
+    <span class="nx">rw</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">.</span><span class="nx">WriteHeader</span><span class="p">(</span><span class="nx">code</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">LogRequests</span><span class="p">(</span><span class="nx">h</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Handler</span><span class="p">)</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Handler</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">http</span><span class="p">.</span><span class="nx">HandlerFunc</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">lr</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">logResponder</span><span class="p">{</span><span class="nx">ResponseWriter</span><span class="p">:</span> <span class="nx">w</span><span class="p">}</span>
+        <span class="nx">m</span><span class="p">,</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">start</span> <span class="o">:=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Method</span><span class="p">,</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Path</span><span class="p">,</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Now</span><span class="p">()</span>
+        <span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+            <span class="nx">log</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="s">&quot;%s %s -&gt; %d (%v)&quot;</span><span class="p">,</span> <span class="nx">m</span><span class="p">,</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">lr</span><span class="p">.</span><span class="nx">code</span><span class="p">,</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Now</span><span class="p">().</span><span class="nx">Sub</span><span class="p">(</span><span class="nx">start</span><span class="p">))</span>
+        <span class="p">}()</span>
+        <span class="nx">h</span><span class="p">(</span><span class="nx">lr</span><span class="p">,</span> <span class="nx">r</span><span class="p">)</span>
+    <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>But <code>*logResponder</code> will now <em>only</em> support the methods declared by
+<code>http.ResponseWriter</code>, even if the wrapped <code>ResponseWriter</code> also supports some
+of the optional interfaces. That is because method sets of a type are
+determined at compile time.</p>
+
+<p>Thus, by using this middleware, the wrapped handler is suddenly unable to use
+websockets, or HTTP/2 server push or any of the other use cases of optional
+interfaces. Even worse: this deficiency will only be discovered at runtime.</p>
+
+<p>Optimistically adding the optional interface&#39;s methods and type-asserting the
+underlying ResponseWriter at runtime doesn&#39;t work either: handlers would
+incorrectly conclude the optional interface is always present. If the
+underlying <code>ResponseWriter</code> does not support adding at the underlying
+connection there just is no useful way to implement <code>http.Hijacker</code>.</p>
+
+<p>There is one way around this, which is to dynamically check the wrapped
+interface and create a type with the correct method set, e.g.:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Wrap</span><span class="p">(</span><span class="nx">wrap</span><span class="p">,</span> <span class="nx">with</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">)</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="p">(</span>
+        <span class="nx">flusher</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Flusher</span>
+        <span class="nx">pusher</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Pusher</span>
+        <span class="c1">// ...</span>
+    <span class="p">)</span>
+    <span class="nx">flusher</span><span class="p">,</span> <span class="nx">_</span> <span class="p">=</span> <span class="nx">wrap</span><span class="p">.(</span><span class="nx">http</span><span class="p">.</span><span class="nx">Flusher</span><span class="p">)</span>
+    <span class="nx">pusher</span><span class="p">,</span> <span class="nx">_</span> <span class="p">=</span> <span class="nx">wrap</span><span class="p">.(</span><span class="nx">http</span><span class="p">.</span><span class="nx">Pusher</span><span class="p">)</span>
+    <span class="c1">// ...</span>
+    <span class="k">if</span> <span class="nx">flusher</span> <span class="o">==</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">pusher</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">with</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">flusher</span> <span class="o">==</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">pusher</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kd">struct</span><span class="p">{</span>
+            <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span>
+            <span class="nx">http</span><span class="p">.</span><span class="nx">Pusher</span>
+        <span class="p">}{</span><span class="nx">with</span><span class="p">,</span> <span class="nx">pusher</span><span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">flusher</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">pusher</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kd">struct</span><span class="p">{</span>
+            <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span>
+            <span class="nx">http</span><span class="p">.</span><span class="nx">Flusher</span>
+        <span class="p">}{</span><span class="nx">with</span><span class="p">,</span> <span class="nx">flusher</span><span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="kd">struct</span><span class="p">{</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">Flusher</span>
+        <span class="nx">http</span><span class="p">.</span><span class="nx">Pusher</span>
+    <span class="p">}{</span><span class="nx">with</span><span class="p">,</span> <span class="nx">flusher</span><span class="p">,</span> <span class="nx">pusher</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This has two major drawbacks:</p>
+
+<ul>
+<li>Both code-size and running time of this will increase exponentially with the
+number of optional interfaces you have to support (even if you generate the
+code).</li>
+<li>You need to know every single optional interface that might be used. While
+supporting everything in <code>net/http</code> is certainly tenable, there might be
+other optional interfaces, defined by some framework unbeknownst to you. If
+you don&#39;t know about it, you can&#39;t wrap it.</li>
+</ul>
+
+<h4 id="what-can-we-use-instead">What can we use instead?</h4>
+
+<p>My general advice is, to avoid optional interfaces as much as possible. There
+are alternatives, though they also are not entirely satisfying.</p>
+
+<h5 id="context-value">Context.Value</h5>
+
+<p><code>context</code> was added after most of the optional interfaces where already
+defined, but its <code>Value</code> method was meant exactly for this kind of thing: to
+pass optional behavior past API boundaries. This will still not solve the
+static type safety issue of optional interfaces, but it does mean you can
+easily wrap them.</p>
+
+<p>For example, <code>net/http</code> could instead do</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">var</span> <span class="nx">ctxFlusher</span> <span class="p">=</span> <span class="nx">ctxKey</span><span class="p">(</span><span class="s">&quot;flusher&quot;</span><span class="p">)</span>
+
+<span class="kd">func</span> <span class="nx">GetFlusher</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">f</span> <span class="nx">Flusher</span><span class="p">,</span> <span class="nx">ok</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">f</span><span class="p">,</span> <span class="nx">ok</span> <span class="p">=</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">Value</span><span class="p">(</span><span class="nx">ctxFlusher</span><span class="p">).(</span><span class="nx">Flusher</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">f</span><span class="p">,</span> <span class="nx">ok</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This would enable you to do</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">f</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nx">GetFlusher</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">Context</span><span class="p">())</span>
+    <span class="k">if</span> <span class="nx">ok</span> <span class="p">{</span>
+        <span class="nx">f</span><span class="p">.</span><span class="nx">Flush</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>If now a middleware wants to wrap <code>ResponseWriter</code>, that&#39;s not a problem, as it
+will not touch the Context. If a middleware wants to add some other optional
+behavior, it can do so easily:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Frobnicator</span> <span class="kd">interface</span><span class="p">{</span>
+    <span class="nx">Frobnicate</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="kd">var</span> <span class="nx">ctxFrobnicator</span> <span class="p">=</span> <span class="nx">ctxKey</span><span class="p">(</span><span class="s">&quot;frobnicator&quot;</span><span class="p">)</span>
+
+<span class="kd">func</span> <span class="nx">GetFrobnicator</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">f</span> <span class="nx">Frobnicator</span><span class="p">,</span> <span class="nx">ok</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">f</span><span class="p">,</span> <span class="nx">ok</span> <span class="p">=</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">Value</span><span class="p">(</span><span class="nx">ctxFrobnicator</span><span class="p">).(</span><span class="nx">Frobnicator</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">f</span><span class="p">,</span> <span class="nx">ok</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>As contexts form a linked list of key-value-pairs, this will interact nicely
+with whatever optional behavior is already defined.</p>
+
+<p>There are good reasons to frown upon the usage of <code>Context.Value</code>; but they
+apply just as much to optional interfaces.</p>
+
+<h5 id="extraction-methods">Extraction methods</h5>
+
+<p>If you know an interface type that is probable to be wrapped and <em>also</em> has
+optional interfaces associated it is possible to enforce the possibility of
+dynamic extension in the optional type. So, e.g.:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kn">package</span> <span class="nx">http</span>
+
+<span class="kd">type</span> <span class="nx">ResponseWriter</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="c1">// Methods…</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">ResponseWriterWrapper</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">ResponseWriter</span>
+
+    <span class="nx">WrappedResponseWriter</span><span class="p">()</span> <span class="nx">ResponseWriter</span>
+<span class="p">}</span>
+
+<span class="c1">// GetFlusher returns an http.Flusher, if res wraps one.</span>
+<span class="c1">// Otherwise, it returns nil.</span>
+<span class="kd">func</span> <span class="nx">GetFlusher</span><span class="p">(</span><span class="nx">res</span> <span class="nx">ResponseWriter</span><span class="p">)</span> <span class="nx">Flusher</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">f</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">res</span><span class="p">.(</span><span class="nx">Flusher</span><span class="p">);</span> <span class="nx">ok</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">f</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">w</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">res</span><span class="p">.(</span><span class="nx">ResponseWriterWrapper</span><span class="p">);</span> <span class="nx">ok</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">GetFlusher</span><span class="p">(</span><span class="nx">w</span><span class="p">.</span><span class="nx">WrappedResponseWriter</span><span class="p">())</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+
+<span class="kn">package</span> <span class="nx">main</span>
+
+<span class="kd">type</span> <span class="nx">logger</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">res</span> <span class="nx">ResponseWriter</span>
+    <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span>
+    <span class="nx">log</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span>
+    <span class="nx">start</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Time</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">logger</span><span class="p">)</span> <span class="nx">WriteHeader</span><span class="p">(</span><span class="nx">code</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">d</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Now</span><span class="p">().</span><span class="nx">Since</span><span class="p">(</span><span class="nx">l</span><span class="p">.</span><span class="nx">start</span><span class="p">)</span>
+    <span class="nx">l</span><span class="p">.</span><span class="nx">log</span><span class="p">.</span><span class="nx">Write</span><span class="p">(</span><span class="s">&quot;%s %s -&gt; %d (%v)&quot;</span><span class="p">,</span> <span class="nx">l</span><span class="p">.</span><span class="nx">req</span><span class="p">.</span><span class="nx">Method</span><span class="p">,</span> <span class="nx">l</span><span class="p">.</span><span class="nx">req</span><span class="p">.</span><span class="nx">Path</span><span class="p">,</span> <span class="nx">code</span><span class="p">,</span> <span class="nx">d</span><span class="p">)</span>
+    <span class="nx">l</span><span class="p">.</span><span class="nx">res</span><span class="p">.</span><span class="nx">WriteHeader</span><span class="p">(</span><span class="nx">code</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">logger</span><span class="p">)</span> <span class="nx">WrappedResponseWriter</span><span class="p">()</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">l</span><span class="p">.</span><span class="nx">res</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">LogRequests</span><span class="p">(</span><span class="nx">h</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Handler</span><span class="p">,</span> <span class="nx">l</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span><span class="p">)</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Hander</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">http</span><span class="p">.</span><span class="nx">HandlerFunc</span><span class="p">(</span><span class="nx">res</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">res</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">logger</span><span class="p">{</span>
+            <span class="nx">res</span><span class="p">:</span> <span class="nx">res</span><span class="p">,</span>
+            <span class="nx">req</span><span class="p">:</span> <span class="nx">req</span><span class="p">,</span>
+            <span class="nx">log</span><span class="p">:</span> <span class="nx">l</span><span class="p">,</span>
+            <span class="nx">start</span><span class="p">:</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Now</span><span class="p">(),</span>
+        <span class="p">}</span>
+        <span class="nx">h</span><span class="p">.</span><span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">res</span><span class="p">,</span> <span class="nx">req</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">res</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="nx">f</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nx">GetFlusher</span><span class="p">(</span><span class="nx">res</span><span class="p">);</span> <span class="nx">f</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">f</span><span class="p">.</span><span class="nx">Flush</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This still doesn&#39;t address the static typing issue and explicit dependencies,
+but at least it enables you to wrap the interface conveniently.</p>
+
+<p>Note, that this is conceptually similar to the <a href="https://github.com/pkg/errors">errors
+package</a>, which calls the wrapper-method
+&quot;Cause&quot;. This package also shows an issue with this pattern; it only
+works if <em>all</em> wrappers use it. That&#39;s why I think it&#39;s important for the
+wrapping interface to live in the same package as the wrapped interface; it
+provides an authoritative way to do that wrapping, preventing fragmentation.</p>
+
+<h5 id="provide-statically-typed-apis">Provide statically typed APIs</h5>
+
+<p><code>net/http</code> could provide alternative APIs for optional interfaces that
+explicitly include them. For example:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Hijacker</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">ResponseWriter</span>
+    <span class="nx">Hijack</span><span class="p">()</span> <span class="p">(</span><span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">,</span> <span class="o">*</span><span class="nx">bufio</span><span class="p">.</span><span class="nx">ReadWriter</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">HijackHandler</span> <span class="kd">interface</span><span class="p">{</span>
+    <span class="nx">ServeHijacker</span><span class="p">(</span><span class="nx">w</span> <span class="nx">Hijacker</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">HandleHijacker</span><span class="p">(</span><span class="nx">pattern</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">h</span> <span class="nx">HijackHandler</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>For some use cases, this provides a good way to side-step the issue of unsafe
+types. Especially if you can come up with a limited set of scenarios that would
+rely on the optional behavior, putting them into their own type would be
+viable.</p>
+
+<p>The <code>net/http</code> package could, for example, provide separate <code>ResponseWriter</code>
+types for different connection types (for example <code>HTTP2Response</code>). It could
+then provide a <code>func(HTTP2Handler) http.Handler</code>, that serves an error if it is
+asked to serve an unsuitable connection and otherwise delegates to the passed
+Handler. Now, the programmer needs to explicitly wire a handler that requires
+HTTP/2 up accordingly. They can rely on the additional features, while also
+making clear what paths must be used over HTTP/2.</p>
+
+<h5 id="gradual-repair">Gradual repair</h5>
+
+<p>I think the use of optional interfaces as in <code>database/sql/driver</code> is perfectly
+fine - <em>if</em> you plan to eventually remove the original interface. Otherwise,
+users will have to continue to implement both interfaces to be usable with your
+API, which is especially painful when wrapping interfaces. For example, I
+recently wanted to wrap
+<a href="http://godoc.org/go/importer#Default">importer.Default</a> to add behavior and
+logging. I also needed <a href="http://godoc.org/go/types#ImporterFrom">ImporterFrom</a>,
+which required separate implementations, depending on whether the importer
+returned by Default implements it or not. Most modern code, however, shouldn&#39;t
+need that.</p>
+
+<p>So, for third party packages (the stdlib can&#39;t do that, because of
+compatibility guarantees), you should consider using the methodology described
+in Russ Cox&#39; excellent <a href="https://talks.golang.org/2016/refactor.article">Codebase Refactoring</a>
+article and actually <em>deprecate</em> and eventually <em>remove</em> the old interface. Use
+optional interfaces as a transition mechanism, not a fix.</p>
+
+<h4 id="how-could-go-improve-the-situation">How could Go improve the situation?</h4>
+
+<h5 id="make-it-possible-for-reflect-to-create-methods">Make it possible for reflect to create methods</h5>
+
+<p>There are currently at least two GitHub issues which would make it possible to
+do extend interfaces dynamically:
+<a href="https://github.com/golang/go/issues/16522">reflect: NamedOf</a>, <a href="https://github.com/golang/go/issues/4146">reflect: MakeInterface</a>.
+I believe this would be the easiest solution - it is backwards compatible and
+doesn&#39;t require any language changes.</p>
+
+<h5 id="provide-a-language-mechanism-for-extension">Provide a language mechanism for extension</h5>
+
+<p>The language could provide a native mechanism to express extension, either by
+adding a
+<a href="https://medium.com/@cep21/interface-wrapping-method-erasure-c523b3549912#13bc">keyword</a>
+for it or, for Go2, by considering to make extension the default behavior for
+<code>interface-&gt;struct</code> embedding. I&#39;m not sure either is a good idea, though. I
+would probably prefer the latter, because of my distaste for keywords. Note,
+that it would still be possible to then compose an interface into a struct,
+just not via embedding but by adding a field and delegation-methods.
+Personally, I&#39;m not a huge fan of embedding interfaces in structs anyway except
+when I&#39;m explicitly trying to extend them with additional behavior.  Their
+zero-value is not usable, so it requires additional hoops to jump through.</p>
+
+<h4 id="conclusion">Conclusion</h4>
+
+<p>I recommend:</p>
+
+<ul>
+<li>If at all possible, avoid optional interfaces in APIs you provide. They are
+just too inconvenient and un-Go-ish.</li>
+<li>Be careful when wrapping interfaces, in particular when there are known
+optional interfaces for them.</li>
+</ul>
+
+<p>Using optional interfaces correctly is inconvenient and cumbersome. That should
+signal that you are fighting the language. The workarounds needed all try to
+circumvent one or more design decision of Go: to value composition over
+inheritance, to prefer static typing and to make computation and behavior
+obvious from code. To me, that signifies that optional interfaces are
+fundamentally not a good fit for the language.</p>
+
+</article>
+
+    </main>
+
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
+        </div>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
+</html>

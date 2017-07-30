@@ -4,12 +4,483 @@
   <title>Between a rock and a crazy place</title>
   <link href="http://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="//blog.merovius.de//atom.xml"/>
-  <updated>2017-07-23T07:57:16+00:00</updated>
+  <updated>2017-07-30T16:40:14+00:00</updated>
   <id>//blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
   </author>
 
+  
+  <entry>
+    <id>//blog.merovius.de//2017/07/30/the-trouble-with-optional-interfaces</id>
+    <link type="text/html" rel="alternate" href="//blog.merovius.de//2017/07/30/the-trouble-with-optional-interfaces.html"/>
+    <title>The trouble with optional interfaces</title>
+    <updated>2017-07-30T18:39:00+00:00</updated>
+    <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: I take a look at the pattern of optional interfaces in Go: what they
+are used for, why they are bad and what we can do about it.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Note: I wrote most of this article on Wednesday, with the intention to finish
+and publish it on the weekend. While I was sleeping, Jack Lindamood published
+&lt;a href=&quot;https://medium.com/@cep21/interface-wrapping-method-erasure-c523b3549912&quot;&gt;this
+post&lt;/a&gt;,
+which talks about much of the same problems.
+&lt;a href=&quot;https://twitter.com/TheMerovius/status/890472264931708928&quot;&gt;This&lt;/a&gt; was the exact
+moment I saw that post :) I decided, to publish this anyway; it contains, in my
+opinion, enough additional content, to be worth it. But I do encourage to
+(also?) read his post.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;what-are-optional-interfaces&quot;&gt;What are optional interfaces?&lt;/h4&gt;
+
+&lt;p&gt;Optional interfaces are interfaces which can optionally be extended by
+implementing some other interface. A good example is
+&lt;a href=&quot;http://godoc.org/net/http#Pusher&quot;&gt;http.Flusher&lt;/a&gt; (and similar), which is
+optionally implemented by an
+&lt;a href=&quot;http://godoc.org/net/http#ResponseWriter&quot;&gt;http.ResponseWriter&lt;/a&gt;. If a request
+comes in via HTTP/2, the ResponseWriter will implement this interface to
+support &lt;a href=&quot;https://en.wikipedia.org/wiki/HTTP/2_Server_Push&quot;&gt;HTTP/2 Server Push&lt;/a&gt;.
+But as not all requests will be over HTTP/2, this isn&amp;#39;t part of the normal
+ResponseWriter interface and instead provided via an optional interface that
+needs to be type-asserted at runtime.&lt;/p&gt;
+
+&lt;p&gt;In general, whenever some piece of code is doing a type-assertion with an
+interface type (that is, use an expression &lt;code&gt;v.(T)&lt;/code&gt;, where &lt;code&gt;T&lt;/code&gt; is an interface
+type), it is very likely offering an optional interface.&lt;/p&gt;
+
+&lt;p&gt;A far from exhaustive list of where the optional interface pattern is used (to
+roughly illustrate the scope of the pattern):&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;http://godoc.org/io#Copy&quot;&gt;io&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;http://godoc.org/net/http#ResponseWriter#Flusher&quot;&gt;net/http&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;http://godoc.org/database/sql/driver#ConnBeginTx&quot;&gt;database/sql/driver&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;http://godoc.org/go/types#Importer&quot;&gt;go/types&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;Dave Chaney&amp;#39;s &lt;a href=&quot;http://godoc.org/github.com/pkg/errors#Cause&quot;&gt;errors package&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;what-are-people-using-them-for&quot;&gt;What are people using them for?&lt;/h4&gt;
+
+&lt;p&gt;There are multiple reasons to use optional interfaces. Let&amp;#39;s find examples for
+them. Note that this list neither claims to be exhaustive (there are probably
+use cases I don&amp;#39;t know about) nor disjunct (in some cases, optional interfaces
+will carry more than one of these use cases). But I think it&amp;#39;s a good rough
+partition to discuss.&lt;/p&gt;
+
+&lt;h5 id=&quot;passing-behavior-through-api-boundaries&quot;&gt;Passing behavior through API boundaries&lt;/h5&gt;
+
+&lt;p&gt;This is the case of &lt;code&gt;ResponseWriter&lt;/code&gt; and its optional interfaces. The API, in
+this case, is the &lt;code&gt;http.Handler&lt;/code&gt; interface that users of the package implement
+and that the package accepts. As features like HTTP/2 Push or connection
+hijacking are not available to all connections, this interface needs to use the
+lowest common denominator between all possible behaviors. So, if more features
+need to be supported, we must somehow be able to pass this optional behavior
+through the &lt;code&gt;http.Handler&lt;/code&gt; interface.&lt;/p&gt;
+
+&lt;h5 id=&quot;enabling-optional-optimizations-features&quot;&gt;Enabling optional optimizations/features&lt;/h5&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://godoc.org/io#Copy&quot;&gt;io.Copy&lt;/a&gt; serves as a good example of this. The
+required interfaces for it to work are just &lt;code&gt;io.Reader&lt;/code&gt; and &lt;code&gt;io.Writer&lt;/code&gt;. But it
+can be made more efficient, if the passed values also implement &lt;code&gt;io.WriterTo&lt;/code&gt;
+or &lt;code&gt;io.ReaderFrom&lt;/code&gt;, respectively. For example, a
+&lt;a href=&quot;http://godoc.org/bytes#Reader.WriteTo&quot;&gt;bytes.Reader&lt;/a&gt; implements &lt;code&gt;WriteTo&lt;/code&gt;.
+This means, you need less copying if the source of an &lt;code&gt;io.Copy&lt;/code&gt; is a
+&lt;code&gt;bytes.Reader&lt;/code&gt;. Compare these two (somewhat naive) implementations:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Writer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;error&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;buf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;make&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;([]&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;byte&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;4096&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;rn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;rerr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Read&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;wn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;werr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Write&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;buf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[:&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;rn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;int64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;wn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;rerr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;EOF&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;rerr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;rerr&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;werr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;werr&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;CopyTo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Writer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;WriterTo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;error&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;WriteTo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Reader&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;byte&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Read&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[]&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;byte&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;error&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:]&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;EOF&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;WriteTo&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;io&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Writer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;error&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Write&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:]&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;int64&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;n&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;err&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;Copy&lt;/code&gt; needs to first allocate a buffer, then copy all the data from the
+&lt;code&gt;*Reader&lt;/code&gt; to that buffer, then pass it to the Writer. &lt;code&gt;CopyTo&lt;/code&gt;, on the other
+hand, can directly pass the byte-slice to the Writer, saving an allocation and
+a copy.&lt;/p&gt;
+
+&lt;p&gt;Some of that cost can be amortized, but in general, its existence is a forced
+consequence of the API. By using optional interfaces, &lt;code&gt;io.Copy&lt;/code&gt; can use the
+more efficient method, if supported, and fall back to the slow method, if not.&lt;/p&gt;
+
+&lt;h5 id=&quot;backwards-compatible-api-changes&quot;&gt;Backwards compatible API changes&lt;/h5&gt;
+
+&lt;p&gt;When &lt;code&gt;database/sql&lt;/code&gt; upgraded to use &lt;code&gt;context&lt;/code&gt;, it needed help from the drivers
+to actually implement cancellation and the like. So it needed to add contexts
+to the methods of &lt;a href=&quot;http://godoc.org/database/sql/driver#Conn&quot;&gt;driver.Conn&lt;/a&gt;. But
+it can&amp;#39;t just do that change; it would be a backwards incompatible API change,
+violating the Go1 compatibility guarantee. It also can&amp;#39;t add a new method to
+the interface to be used, as there are third-party implementations for drivers,
+which would be broken as they don&amp;#39;t implement the new method.&lt;/p&gt;
+
+&lt;p&gt;So it instead resorted to
+&lt;a href=&quot;https://golang.org/src/database/sql/driver/driver.go#L159&quot;&gt;deprecate&lt;/a&gt; the old
+methods and instead encourage driver implementers to add optional methods
+including the context.&lt;/p&gt;
+
+&lt;h4 id=&quot;why-are-they-bad&quot;&gt;Why are they bad?&lt;/h4&gt;
+
+&lt;p&gt;There are several problems with using optional interfaces. Some of them have
+workarounds (see below), but all of them have drawbacks on their own.&lt;/p&gt;
+
+&lt;h5 id=&quot;they-violate-static-type-safety&quot;&gt;They violate static type safety&lt;/h5&gt;
+
+&lt;p&gt;In a lot of cases, the consumer of an optional interface can&amp;#39;t really treat it
+as optional. For example, &lt;code&gt;http.Hijacker&lt;/code&gt; is usually used to support
+WebSockets. A handler for WebSockets will, in general, not be able to do
+anything useful, when called with a &lt;code&gt;ResponseWriter&lt;/code&gt; that does not implement
+&lt;code&gt;Hijacker&lt;/code&gt;. Even when it correctly does a comma-ok type assertion to check
+for it, it can&amp;#39;t do anything but serve an error in that case.&lt;/p&gt;
+
+&lt;p&gt;The http.Hijacker type conveys the necessity of hijacking a connection, but
+since it is provided as an optional interface, there is no possibility to
+require this type statically. In that way, optional interfaces hide static type
+information.&lt;/p&gt;
+
+&lt;h5 id=&quot;they-remove-a-lot-of-the-power-of-interfaces&quot;&gt;They remove a lot of the power of interfaces&lt;/h5&gt;
+
+&lt;p&gt;Go&amp;#39;s interfaces are really powerful by being very small; in general, the
+advice is to only add one method, maybe a small handful. This advice enables
+easy and powerful composition. &lt;code&gt;io.Reader&lt;/code&gt; and &lt;code&gt;io.Writer&lt;/code&gt; have a myriad of
+implementations inside and outside of the standard library. This makes it
+really easy to, say, read uncompressed data from a compressed network
+connection, while streaming it to a file and hashing it at the same time to
+write to some content-addressed blob storage.&lt;/p&gt;
+
+&lt;p&gt;Now, this composition will, in general, destroy any optional interfaces of
+those values. Say, we have an HTTP middleware to log requests. It wants to wrap
+an &lt;code&gt;http.Handler&lt;/code&gt; and log the requests method, path, response code and duration
+(or, equivalently, collect them as metrics to export). This is, in principle,
+easy to do:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;logResponder&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;struct&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;set&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;rw&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;logResponder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;WriteHeader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;rw&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;rw&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;set&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;rw&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;WriteHeader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;LogRequests&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;h&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Handler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Handler&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;HandlerFunc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Request&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;lr&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;logResponder&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;m&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;start&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Method&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Now&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;defer&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Printf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;%s %s -&amp;gt; %d (%v)&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;m&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;p&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;lr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Now&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;().&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Sub&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}()&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;h&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;lr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;})&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;But &lt;code&gt;*logResponder&lt;/code&gt; will now &lt;em&gt;only&lt;/em&gt; support the methods declared by
+&lt;code&gt;http.ResponseWriter&lt;/code&gt;, even if the wrapped &lt;code&gt;ResponseWriter&lt;/code&gt; also supports some
+of the optional interfaces. That is because method sets of a type are
+determined at compile time.&lt;/p&gt;
+
+&lt;p&gt;Thus, by using this middleware, the wrapped handler is suddenly unable to use
+websockets, or HTTP/2 server push or any of the other use cases of optional
+interfaces. Even worse: this deficiency will only be discovered at runtime.&lt;/p&gt;
+
+&lt;p&gt;Optimistically adding the optional interface&amp;#39;s methods and type-asserting the
+underlying ResponseWriter at runtime doesn&amp;#39;t work either: handlers would
+incorrectly conclude the optional interface is always present. If the
+underlying &lt;code&gt;ResponseWriter&lt;/code&gt; does not support adding at the underlying
+connection there just is no useful way to implement &lt;code&gt;http.Hijacker&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;There is one way around this, which is to dynamically check the wrapped
+interface and create a type with the correct method set, e.g.:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Wrap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;wrap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;with&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Pusher&lt;/span&gt;
+        &lt;span class=&quot;c1&quot;&gt;// ...&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;_&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;wrap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;_&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;wrap&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Pusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// ...&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;with&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;struct&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Pusher&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;with&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;struct&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;with&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;struct&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Pusher&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}{&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;with&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;pusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;This has two major drawbacks:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Both code-size and running time of this will increase exponentially with the
+number of optional interfaces you have to support (even if you generate the
+code).&lt;/li&gt;
+&lt;li&gt;You need to know every single optional interface that might be used. While
+supporting everything in &lt;code&gt;net/http&lt;/code&gt; is certainly tenable, there might be
+other optional interfaces, defined by some framework unbeknownst to you. If
+you don&amp;#39;t know about it, you can&amp;#39;t wrap it.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;what-can-we-use-instead&quot;&gt;What can we use instead?&lt;/h4&gt;
+
+&lt;p&gt;My general advice is, to avoid optional interfaces as much as possible. There
+are alternatives, though they also are not entirely satisfying.&lt;/p&gt;
+
+&lt;h5 id=&quot;context-value&quot;&gt;Context.Value&lt;/h5&gt;
+
+&lt;p&gt;&lt;code&gt;context&lt;/code&gt; was added after most of the optional interfaces where already
+defined, but its &lt;code&gt;Value&lt;/code&gt; method was meant exactly for this kind of thing: to
+pass optional behavior past API boundaries. This will still not solve the
+static type safety issue of optional interfaces, but it does mean you can
+easily wrap them.&lt;/p&gt;
+
+&lt;p&gt;For example, &lt;code&gt;net/http&lt;/code&gt; could instead do&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ctxFlusher&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ctxKey&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;flusher&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;GetFlusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ctx&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Context&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ctx&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Value&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ctxFlusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;This would enable you to do&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ServeHTTP&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Request&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;GetFlusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Context&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flush&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;If now a middleware wants to wrap &lt;code&gt;ResponseWriter&lt;/code&gt;, that&amp;#39;s not a problem, as it
+will not touch the Context. If a middleware wants to add some other optional
+behavior, it can do so easily:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Frobnicator&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;Frobnicate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ctxFrobnicator&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ctxKey&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;frobnicator&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;GetFrobnicator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ctx&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Context&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Frobnicator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ctx&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Value&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ctxFrobnicator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Frobnicator&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;As contexts form a linked list of key-value-pairs, this will interact nicely
+with whatever optional behavior is already defined.&lt;/p&gt;
+
+&lt;p&gt;There are good reasons to frown upon the usage of &lt;code&gt;Context.Value&lt;/code&gt;; but they
+apply just as much to optional interfaces.&lt;/p&gt;
+
+&lt;h5 id=&quot;extraction-methods&quot;&gt;Extraction methods&lt;/h5&gt;
+
+&lt;p&gt;If you know an interface type that is probable to be wrapped and &lt;em&gt;also&lt;/em&gt; has
+optional interfaces associated it is possible to enforce the possibility of
+dynamic extension in the optional type. So, e.g.:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Methods…&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ResponseWriterWrapper&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+
+    &lt;span class=&quot;nx&quot;&gt;WrappedResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// GetFlusher returns an http.Flusher, if res wraps one.&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;// Otherwise, it returns nil.&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;GetFlusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriterWrapper&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ok&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;GetFlusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;WrappedResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;())&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;main&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;logger&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;struct&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Request&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Logger&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;start&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Time&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;logger&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;WriteHeader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;d&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Now&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;().&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Since&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Write&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&amp;quot;%s %s -&amp;gt; %d (%v)&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Method&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;d&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;WriteHeader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;logger&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;WrappedResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;LogRequests&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;h&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Handler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Logger&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Hander&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;HandlerFunc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Request&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;logger&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;l&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+            &lt;span class=&quot;nx&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Now&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;h&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ServeHTTP&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;ServeHTTP&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;req&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Request&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;GetFlusher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;res&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;nil&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Flush&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;This still doesn&amp;#39;t address the static typing issue and explicit dependencies,
+but at least it enables you to wrap the interface conveniently.&lt;/p&gt;
+
+&lt;p&gt;Note, that this is conceptually similar to the &lt;a href=&quot;https://github.com/pkg/errors&quot;&gt;errors
+package&lt;/a&gt;, which calls the wrapper-method
+&amp;quot;Cause&amp;quot;. This package also shows an issue with this pattern; it only
+works if &lt;em&gt;all&lt;/em&gt; wrappers use it. That&amp;#39;s why I think it&amp;#39;s important for the
+wrapping interface to live in the same package as the wrapped interface; it
+provides an authoritative way to do that wrapping, preventing fragmentation.&lt;/p&gt;
+
+&lt;h5 id=&quot;provide-statically-typed-apis&quot;&gt;Provide statically typed APIs&lt;/h5&gt;
+
+&lt;p&gt;&lt;code&gt;net/http&lt;/code&gt; could provide alternative APIs for optional interfaces that
+explicitly include them. For example:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-go&quot; data-lang=&quot;go&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Hijacker&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;ResponseWriter&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;Hijack&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;net&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Conn&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;bufio&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ReadWriter&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;error&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;HijackHandler&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;ServeHijacker&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;w&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Hijacker&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;r&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;http&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Request&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;HandleHijacker&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;pattern&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;string&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;h&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;HijackHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// ...&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;For some use cases, this provides a good way to side-step the issue of unsafe
+types. Especially if you can come up with a limited set of scenarios that would
+rely on the optional behavior, putting them into their own type would be
+viable.&lt;/p&gt;
+
+&lt;p&gt;The &lt;code&gt;net/http&lt;/code&gt; package could, for example, provide separate &lt;code&gt;ResponseWriter&lt;/code&gt;
+types for different connection types (for example &lt;code&gt;HTTP2Response&lt;/code&gt;). It could
+then provide a &lt;code&gt;func(HTTP2Handler) http.Handler&lt;/code&gt;, that serves an error if it is
+asked to serve an unsuitable connection and otherwise delegates to the passed
+Handler. Now, the programmer needs to explicitly wire a handler that requires
+HTTP/2 up accordingly. They can rely on the additional features, while also
+making clear what paths must be used over HTTP/2.&lt;/p&gt;
+
+&lt;h5 id=&quot;gradual-repair&quot;&gt;Gradual repair&lt;/h5&gt;
+
+&lt;p&gt;I think the use of optional interfaces as in &lt;code&gt;database/sql/driver&lt;/code&gt; is perfectly
+fine - &lt;em&gt;if&lt;/em&gt; you plan to eventually remove the original interface. Otherwise,
+users will have to continue to implement both interfaces to be usable with your
+API, which is especially painful when wrapping interfaces. For example, I
+recently wanted to wrap
+&lt;a href=&quot;http://godoc.org/go/importer#Default&quot;&gt;importer.Default&lt;/a&gt; to add behavior and
+logging. I also needed &lt;a href=&quot;http://godoc.org/go/types#ImporterFrom&quot;&gt;ImporterFrom&lt;/a&gt;,
+which required separate implementations, depending on whether the importer
+returned by Default implements it or not. Most modern code, however, shouldn&amp;#39;t
+need that.&lt;/p&gt;
+
+&lt;p&gt;So, for third party packages (the stdlib can&amp;#39;t do that, because of
+compatibility guarantees), you should consider using the methodology described
+in Russ Cox&amp;#39; excellent &lt;a href=&quot;https://talks.golang.org/2016/refactor.article&quot;&gt;Codebase Refactoring&lt;/a&gt;
+article and actually &lt;em&gt;deprecate&lt;/em&gt; and eventually &lt;em&gt;remove&lt;/em&gt; the old interface. Use
+optional interfaces as a transition mechanism, not a fix.&lt;/p&gt;
+
+&lt;h4 id=&quot;how-could-go-improve-the-situation&quot;&gt;How could Go improve the situation?&lt;/h4&gt;
+
+&lt;h5 id=&quot;make-it-possible-for-reflect-to-create-methods&quot;&gt;Make it possible for reflect to create methods&lt;/h5&gt;
+
+&lt;p&gt;There are currently at least two GitHub issues which would make it possible to
+do extend interfaces dynamically:
+&lt;a href=&quot;https://github.com/golang/go/issues/16522&quot;&gt;reflect: NamedOf&lt;/a&gt;, &lt;a href=&quot;https://github.com/golang/go/issues/4146&quot;&gt;reflect: MakeInterface&lt;/a&gt;.
+I believe this would be the easiest solution - it is backwards compatible and
+doesn&amp;#39;t require any language changes.&lt;/p&gt;
+
+&lt;h5 id=&quot;provide-a-language-mechanism-for-extension&quot;&gt;Provide a language mechanism for extension&lt;/h5&gt;
+
+&lt;p&gt;The language could provide a native mechanism to express extension, either by
+adding a
+&lt;a href=&quot;https://medium.com/@cep21/interface-wrapping-method-erasure-c523b3549912#13bc&quot;&gt;keyword&lt;/a&gt;
+for it or, for Go2, by considering to make extension the default behavior for
+&lt;code&gt;interface-&amp;gt;struct&lt;/code&gt; embedding. I&amp;#39;m not sure either is a good idea, though. I
+would probably prefer the latter, because of my distaste for keywords. Note,
+that it would still be possible to then compose an interface into a struct,
+just not via embedding but by adding a field and delegation-methods.
+Personally, I&amp;#39;m not a huge fan of embedding interfaces in structs anyway except
+when I&amp;#39;m explicitly trying to extend them with additional behavior.  Their
+zero-value is not usable, so it requires additional hoops to jump through.&lt;/p&gt;
+
+&lt;h4 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h4&gt;
+
+&lt;p&gt;I recommend:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;If at all possible, avoid optional interfaces in APIs you provide. They are
+just too inconvenient and un-Go-ish.&lt;/li&gt;
+&lt;li&gt;Be careful when wrapping interfaces, in particular when there are known
+optional interfaces for them.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Using optional interfaces correctly is inconvenient and cumbersome. That should
+signal that you are fighting the language. The workarounds needed all try to
+circumvent one or more design decision of Go: to value composition over
+inheritance, to prefer static typing and to make computation and behavior
+obvious from code. To me, that signifies that optional interfaces are
+fundamentally not a good fit for the language.&lt;/p&gt;
+</content>
+  </entry>
   
   <entry>
     <id>//blog.merovius.de//2017/07/22/using-hilbert-curves-to-100-zelda</id>
@@ -291,7 +762,7 @@ frustrated by it. In this post I want to explain why routers &lt;em&gt;in genera
 including &lt;code&gt;http.ServeMux&lt;/code&gt; - should be avoided and what I consider simple,
 maintainable and scalable routing using nothing but the stdlib.&lt;/p&gt;
 
-&lt;h4&gt;But why?&lt;/h4&gt;
+&lt;h4 id=&quot;but-why&quot;&gt;But why?&lt;/h4&gt;
 
 &lt;p&gt;&lt;img src=&quot;https://i.giphy.com/1M9fmo1WAFVK0.webp&quot; alt=&quot;But why?&quot;&gt;&lt;/p&gt;
 
@@ -364,7 +835,7 @@ packages needed in the whole application) and it becomes unmaintainable after a
 while. You can alleviate that by delegating to subrouters though; which really
 is the basis of how I prefer to do all of this these days.&lt;/p&gt;
 
-&lt;h4&gt;How to use the stdlib to route&lt;/h4&gt;
+&lt;h4 id=&quot;how-to-use-the-stdlib-to-route&quot;&gt;How to use the stdlib to route&lt;/h4&gt;
 
 &lt;p&gt;Let&amp;#39;s build the toy example from &lt;a href=&quot;https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6&quot;&gt;this medium post&lt;/a&gt;.
 It&amp;#39;s not terribly complicated but it serves nicely to illustrate the general
@@ -511,7 +982,7 @@ coupling. But that&amp;#39;s not true. Its &lt;code&gt;UserHandler&lt;/code&gt; 
 of your choice (flags, dependency injection,…) and gets wired up in &lt;code&gt;main&lt;/code&gt;. All
 &lt;code&gt;App&lt;/code&gt; needs to know is the API of the handlers it&amp;#39;s &lt;em&gt;directly&lt;/em&gt; invoking.&lt;/p&gt;
 
-&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;h4 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h4&gt;
 
 &lt;p&gt;I hope I convinced you that routers &lt;em&gt;in and off itself&lt;/em&gt; are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
@@ -745,7 +1216,7 @@ talk about in a meaningful way and must be dealt with separately anyway.
 possible changes you could do to an API and check whether they are breaking
 under the definition of the go1 compatibility promise:&lt;/p&gt;
 
-&lt;h4&gt;Adding func/type/var/const at package scope&lt;/h4&gt;
+&lt;h4 id=&quot;adding-func-type-var-const-at-package-scope&quot;&gt;Adding func/type/var/const at package scope&lt;/h4&gt;
 
 &lt;p&gt;This is the only thing that seems to be fine under the stability guarantee.  It
 turns out the go authors thought about this one and put the exception of
@@ -763,23 +1234,23 @@ to use a separate &lt;code&gt;foo_test&lt;/code&gt; package for your tests to br
 In that case it is widely deemed acceptable to &lt;code&gt;. import &amp;quot;foo&amp;quot;&lt;/code&gt; to save typing
 and add clarity.&lt;/p&gt;
 
-&lt;h4&gt;Removing func/type/var/const at package scope&lt;/h4&gt;
+&lt;h4 id=&quot;removing-func-type-var-const-at-package-scope&quot;&gt;Removing func/type/var/const at package scope&lt;/h4&gt;
 
 &lt;p&gt;Downstream might use the removed function/type/variable/constant, so this is
 obviously a breaking change.&lt;/p&gt;
 
-&lt;h4&gt;Adding a method to an interface&lt;/h4&gt;
+&lt;h4 id=&quot;adding-a-method-to-an-interface&quot;&gt;Adding a method to an interface&lt;/h4&gt;
 
 &lt;p&gt;Downstream might want to create an implementation of your interface and try to
 pass it. After you add a method, this type doesn&amp;#39;t implement your interface
 anymore and downstreams code will break.&lt;/p&gt;
 
-&lt;h4&gt;Removing a method from an interface&lt;/h4&gt;
+&lt;h4 id=&quot;removing-a-method-from-an-interface&quot;&gt;Removing a method from an interface&lt;/h4&gt;
 
 &lt;p&gt;Downstream might want to call this method on a value of your interface type, so
 this is obviously a breaking change.&lt;/p&gt;
 
-&lt;h4&gt;Adding a field to a struct&lt;/h4&gt;
+&lt;h4 id=&quot;adding-a-field-to-a-struct&quot;&gt;Adding a field to a struct&lt;/h4&gt;
 
 &lt;p&gt;This is perhaps surprising, but adding a field to a struct is a breaking
 change. The reason is, that downstream might embed two types into a struct. If
@@ -835,20 +1306,20 @@ to write the selector and wrap every embedded method anyway.&lt;/p&gt;
 &lt;p&gt;I hope we all agree that type embedding is awesome and shouldn&amp;#39;t need to be
 avoided :)&lt;/p&gt;
 
-&lt;h4&gt;Removing a field from a struct&lt;/h4&gt;
+&lt;h4 id=&quot;removing-a-field-from-a-struct&quot;&gt;Removing a field from a struct&lt;/h4&gt;
 
 &lt;p&gt;Downstream might use the now removed field, so this is obviously a breaking change.&lt;/p&gt;
 
-&lt;h4&gt;Adding a method to a type&lt;/h4&gt;
+&lt;h4 id=&quot;adding-a-method-to-a-type&quot;&gt;Adding a method to a type&lt;/h4&gt;
 
 &lt;p&gt;The argument is pretty much the same as adding a field to a struct: Downstream
 might embed your type and suddenly get ambiguities.&lt;/p&gt;
 
-&lt;h4&gt;Removing a method from a type&lt;/h4&gt;
+&lt;h4 id=&quot;removing-a-method-from-a-type&quot;&gt;Removing a method from a type&lt;/h4&gt;
 
 &lt;p&gt;Downstream might call the now removed method, so this is obviously a breaking change.&lt;/p&gt;
 
-&lt;h4&gt;Changing a function/method signature&lt;/h4&gt;
+&lt;h4 id=&quot;changing-a-function-method-signature&quot;&gt;Changing a function/method signature&lt;/h4&gt;
 
 &lt;p&gt;Most changes are obviously breaking. But as it turns out you can&amp;#39;t do &lt;em&gt;any&lt;/em&gt;
 change to a function or method signature. This includes adding a variadic
@@ -858,7 +1329,7 @@ call site will still be correct, right?&lt;/p&gt;
 &lt;p&gt;The reason is, that downstream might save your function or method in a variable
 of the old type, which will break because of nonassignable types.&lt;/p&gt;
 
-&lt;h4&gt;Conclusion&lt;/h4&gt;
+&lt;h4 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h4&gt;
 
 &lt;p&gt;It looks to me like anything that isn&amp;#39;t just adding a new Identifier to the
 package-scope will potentially break &lt;em&gt;some&lt;/em&gt; downstream. This severely limits
@@ -1049,7 +1520,7 @@ devs for prioritizing simplicity over making me happy.&lt;/p&gt;
 
 &lt;p&gt;&lt;a name=&quot;generics&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h4&gt;Generics&lt;/h4&gt;
+&lt;h4 id=&quot;generics&quot;&gt;Generics&lt;/h4&gt;
 
 &lt;p&gt;So let&amp;#39;s get this elephant out of the room first. I think this is the most
 named feature lacking from go. They are asked so often, they have their own
@@ -1137,7 +1608,7 @@ web-crawler). The answer is to have the caller maintain this mapping via a
 
 &lt;p&gt;&lt;a name=&quot;weakrefs&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h4&gt;Weak references&lt;/h4&gt;
+&lt;h4 id=&quot;weak-references&quot;&gt;Weak references&lt;/h4&gt;
 
 &lt;p&gt;I have to admit, that I am not sure, my use case here is really an important or
 even very nice one, but let&amp;#39;s assume I want to have a database abstraction that
@@ -1164,7 +1635,7 @@ database).&lt;/p&gt;
 
 &lt;p&gt;&lt;a name=&quot;dynload&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h4&gt;Dynamic loading of go code&lt;/h4&gt;
+&lt;h4 id=&quot;dynamic-loading-of-go-code&quot;&gt;Dynamic loading of go code&lt;/h4&gt;
 
 &lt;p&gt;It would be useful to be able to dynamically load go code at runtime, to build
 plugins for go software. Specifically I want a good go replacement for
@@ -1203,7 +1674,7 @@ nearish future.&lt;/p&gt;
 
 &lt;p&gt;&lt;a name=&quot;gcgoroutines&quot;&gt;&lt;/a&gt;&lt;/p&gt;
 
-&lt;h4&gt;Garbage-collected goroutines&lt;/h4&gt;
+&lt;h4 id=&quot;garbage-collected-goroutines&quot;&gt;Garbage-collected goroutines&lt;/h4&gt;
 
 &lt;p&gt;Now, this is the only thing I really don&amp;#39;t understand why it is not part of the
 language. Concurrency in go is a first-class citizen and garbage-collection is
@@ -1841,7 +2312,7 @@ that&amp;#39;s a different story). But there actually was plenty of space left.&
 ever get this error message (using ext4) you should probably check these four
 things (my issue was the last one):&lt;/p&gt;
 
-&lt;h4&gt;Do you &lt;em&gt;actually&lt;/em&gt; have enough space?&lt;/h4&gt;
+&lt;h4 id=&quot;do-you-actually-have-enough-space&quot;&gt;Do you &lt;em&gt;actually&lt;/em&gt; have enough space?&lt;/h4&gt;
 
 &lt;p&gt;Use &lt;code&gt;df -h&lt;/code&gt;. There is actually a very common pitfall with ext4. Let&amp;#39;s have a look:&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;&lt;span&gt;&lt;/span&gt;mero@rincewind ~$ df -h
@@ -1864,7 +2335,7 @@ Reserved block count:     2499541
 Reserved blocks uid:      0 (user root)
 Reserved blocks gid:      0 (group root)
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;h4&gt;Do you have too many files?&lt;/h4&gt;
+&lt;h4 id=&quot;do-you-have-too-many-files&quot;&gt;Do you have too many files?&lt;/h4&gt;
 
 &lt;p&gt;Even though you might have enough space left, it might well be, that you have
 too many files. ext4 allows an enormous amount of files on any file system, but
@@ -1877,7 +2348,7 @@ it is limited. Checking this is easy: Just use &lt;code&gt;df -i&lt;/code&gt;:&l
 column near 100, you probably want to delete some old files (and you should
 &lt;em&gt;definitely&lt;/em&gt; question, how so many files could be created to begin with).&lt;/p&gt;
 
-&lt;h4&gt;Do a file system check&lt;/h4&gt;
+&lt;h4 id=&quot;do-a-file-system-check&quot;&gt;Do a file system check&lt;/h4&gt;
 
 &lt;p&gt;At least some people on the internet say, that something like this has
 happened to them after a crash (coincidentally my system crashed before the
@@ -1886,7 +2357,7 @@ check got rid of it. So you probably want to run &lt;code&gt;fsck -f &amp;lt;pat
 to run such a check. You probably also want to do that from a live-system, if
 you cannot unmount it (for example if it&amp;#39;s mounted at the root-dir).&lt;/p&gt;
 
-&lt;h4&gt;Do you have &lt;code&gt;dir_index&lt;/code&gt; enabled?&lt;/h4&gt;
+&lt;h4 id=&quot;do-you-have-dir_index-enabled&quot;&gt;Do you have &lt;code&gt;dir_index&lt;/code&gt; enabled?&lt;/h4&gt;
 
 &lt;p&gt;So this is the punch line: ext4 has the possibility to hash the filenames of
 its contents. This enhances performance, but has a “small” problem: ext4 does

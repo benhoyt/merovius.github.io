@@ -50,7 +50,7 @@ frustrated by it. In this post I want to explain why routers <em>in general</em>
 including <code>http.ServeMux</code> - should be avoided and what I consider simple,
 maintainable and scalable routing using nothing but the stdlib.</p>
 
-<h4>But why?</h4>
+<h4 id="but-why">But why?</h4>
 
 <p><img src="https://i.giphy.com/1M9fmo1WAFVK0.webp" alt="But why?"></p>
 
@@ -123,7 +123,7 @@ packages needed in the whole application) and it becomes unmaintainable after a
 while. You can alleviate that by delegating to subrouters though; which really
 is the basis of how I prefer to do all of this these days.</p>
 
-<h4>How to use the stdlib to route</h4>
+<h4 id="how-to-use-the-stdlib-to-route">How to use the stdlib to route</h4>
 
 <p>Let&#39;s build the toy example from <a href="https://medium.com/@joeybloggs/gos-std-net-http-is-all-you-need-right-1c5555a9f2f6">this medium post</a>.
 It&#39;s not terribly complicated but it serves nicely to illustrate the general
@@ -270,7 +270,7 @@ coupling. But that&#39;s not true. Its <code>UserHandler</code> could be created
 of your choice (flags, dependency injection,…) and gets wired up in <code>main</code>. All
 <code>App</code> needs to know is the API of the handlers it&#39;s <em>directly</em> invoking.</p>
 
-<h4>Conclusion</h4>
+<h4 id="conclusion">Conclusion</h4>
 
 <p>I hope I convinced you that routers <em>in and off itself</em> are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
