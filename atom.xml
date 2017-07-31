@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="http://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="//blog.merovius.de//atom.xml"/>
-  <updated>2017-07-30T16:40:14+00:00</updated>
+  <updated>2017-07-31T05:52:10+00:00</updated>
   <id>//blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -33,7 +33,7 @@ opinion, enough additional content, to be worth it. But I do encourage to
 
 &lt;p&gt;Optional interfaces are interfaces which can optionally be extended by
 implementing some other interface. A good example is
-&lt;a href=&quot;http://godoc.org/net/http#Pusher&quot;&gt;http.Flusher&lt;/a&gt; (and similar), which is
+&lt;a href=&quot;http://godoc.org/net/http#Flusher&quot;&gt;http.Flusher&lt;/a&gt; (and similar), which is
 optionally implemented by an
 &lt;a href=&quot;http://godoc.org/net/http#ResponseWriter&quot;&gt;http.ResponseWriter&lt;/a&gt;. If a request
 comes in via HTTP/2, the ResponseWriter will implement this interface to
