@@ -23,7 +23,7 @@ opinion, enough additional content, to be worth it. But I do encourage to
 
 Optional interfaces are interfaces which can optionally be extended by
 implementing some other interface. A good example is
-[http.Flusher](http://godoc.org/net/http#Pusher) (and similar), which is
+[http.Flusher](http://godoc.org/net/http#Flusher) (and similar), which is
 optionally implemented by an
 [http.ResponseWriter](http://godoc.org/net/http#ResponseWriter). If a request
 comes in via HTTP/2, the ResponseWriter will implement this interface to
