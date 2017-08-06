@@ -2,6 +2,7 @@
 layout: post
 title: "What I want from a logging API"
 tldr: "Logging in Go is a notoriously lacking topic in the standard library. There are 3rd-party libraries trying to work around this. I'm trying to explain, why I find them still lacking"
+tags: ["golang", "programming"]
 date: 2017-08-06 20:08:56
 ---
 
