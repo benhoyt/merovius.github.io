@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Why context.Value matters and how to improve it</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
+
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom feed">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="RSS feed">
+    </script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
+
+    <main class="container">
+      <h3>Why context.Value matters and how to improve it</h3>
+<p>2017-08-14</p>
+
+<article>
+<p><strong>tl;dr: I think context.Value solves the important use case of writing
+stateless - and thus scalable - abstractions. I believe
+<a href="https://en.wikipedia.org/wiki/Scope_(computer_science)#Dynamic_scoping">dynamic scoping</a>
+could provide the same benefits while solving most of the criticism of the
+current implementation. I thus try to steer the discussion away from the
+concrete implementation and towards the underlying problem.</strong></p>
+
+<p><em>This blog post is relatively long. I encourage you to skip sections you find boring</em></p>
+
+<hr>
+
+<p>Lately <a href="https://faiface.github.io/post/context-should-go-away-go2/">this
+blogpost</a> has been
+discussed in several Go forums. It brings up several good arguments against the
+<a href="http://godoc.org/context">context-package</a>:</p>
+
+<ul>
+<li>It requires every intermediate functions to include a <code>context.Context</code> even
+if they themselves do not use it. This introduces clutter into APIs and
+requires extensive plumbing.  Additionally, <code>ctx context.Context</code> &quot;stutters&quot;.</li>
+<li><code>context.Value</code> is not statically type-safe, requiring type-assertions.</li>
+<li>It does not allow you to express critical dependencies on context-contents
+statically.</li>
+<li>It&#39;s susceptible to name collisions due to requiring a global namespace.</li>
+<li>It&#39;s a map implemented as a linked list and thus inefficient.</li>
+</ul>
+
+<p>However, I don&#39;t think the post is doing a good enough job to discuss the
+problems context was designed to <em>solve</em>. It explicitly focuses on cancellation.
+<code>Context.Value</code> is discarded by simply stating that</p>
+
+<blockquote>
+<p>[…] designing your APIs without ctx.Value in mind at all makes it always
+possible to come up with alternatives.</p>
+</blockquote>
+
+<p>I think this is not doing this question justice. To have a reasoned argument
+about context.Value there need to be consideration for both sides involved.
+No matter what your opinion on the current API is: The fact that seasoned,
+intelligent engineers felt the need - after significant thought - for
+<code>Context.Value</code> should already imply that the question deserves more attention.</p>
+
+<p>I&#39;m going to try to describe my view on what kind of problems the context
+package tries to address, what alternatives currently exist and why I find them
+insufficient and I&#39;m trying to describe an alternative design for a future
+evolution of the language. It would solve the same problems while avoiding some
+of the learned downsides of the context package. It is not meant as a specific
+proposal for Go 2 (I consider that way premature at this point) but just to
+show that a balanced view can show up alternatives in the design space and make
+it easier to consider all options.</p>
+
+<hr>
+
+<p>The problem context sets out to solve is one of abstracting a problem into
+independently executing units handled by different parts of a system. And how
+to scope data to one of these units in this scenario. It&#39;s hard to clearly
+define the abstraction I am talking about. So I&#39;m instead going to give some
+examples.</p>
+
+<ul>
+<li>When you build a scalable web service you will probably have a stateless
+frontend server that does things like authentication, verification and
+parsing for you. This allows you to scale up the external interface
+effortlessly and thus also gracefully fall back if the load increases past
+what the backends can handle. By treating requests as independent from each
+other you can load-balance them freely between your frontends.</li>
+<li><a href="https://en.wikipedia.org/wiki/Microservices">Microservices</a> split a large
+application into small individual pieces that each process individual
+requests, each potentially branching out into more requests to other
+services. The requests will usually be independent, making it easy to scale
+individual microservices up and down based on demand, to load-balance between
+instances and to solve problems in <a href="https://istio.io/">transparent proxies</a>.</li>
+<li><a href="https://en.wikipedia.org/wiki/Serverless_computing">Functions as a Service</a>
+goes one step further: You write single stateless functions that transform
+data and the platform will make them scale and execute efficiently.</li>
+<li>Even <a href="https://en.wikipedia.org/wiki/Communicating_sequential_processes">CSP</a>,
+the concurrency model built into Go, can be viewed through that lens. The
+programmer expresses her problem as individually executing &quot;processes&quot; and
+the runtime will execute them efficiently.</li>
+<li><a href="https://en.wikipedia.org/wiki/Functional_programming">Functional Programming</a>
+as a paradigm calls this &quot;purity&quot;. The concept that a functions result may
+only depend on its input parameters means not much more than the absence of
+shared state and independent execution.</li>
+<li>The design of a <a href="https://docs.google.com/document/d/1gCsFxXamW8RRvOe5hECz98Ftk-tcRRJcDFANj2VwCB0/edit">Request Oriented Collector</a>
+for Go plays exactly into the same assumptions and ideas.</li>
+</ul>
+
+<p>The idea in all these cases is to increase scaling (whether distributed among
+machines, between threads or just in code) by reducing shared state while
+maintaining shared usage of resources.</p>
+
+<p>Go takes a measured approach to this. It doesn&#39;t go as far as some functional
+programming languages to forbid or discourage mutable state. It allows sharing
+memory between threads and synchronizing with mutexes instead of relying purely
+on channels. But it also definitely tries to be a (if not <em>the</em>) language to
+write modern, scalable services in. As such, it <em>needs</em> to be a good language
+to write this kind of stateless services. It needs to be able to make
+<em>requests</em> the level of isolation instead of the process. At least to a degree.</p>
+
+<p><em>(Side note: This seems to play into the statement of the author of above
+article, who claims that context is mainly useful for server authors. I
+disagree though. The general abstraction happens on many levels. E.g. a click
+in a GUI counts just as much as a &quot;request&quot; for this abstraction as an HTTP
+request)</em></p>
+
+<p>This brings with it the requirement of being able to store some data on a
+request-level. A simple example for this would be authentication in an <a href="https://grpc.io/">RPC
+framework</a>. Different requests will have different
+capabilities. If a request originates from an administrator it should have
+higher privileges than if it originates from an unauthenticated user. This is
+fundamentally <em>request scoped</em> data. Not process, service or application
+scoped. And the RPC framework should treat this data as opaque. It is
+application specific not only how that data looks en détail but also <em>what
+kinds</em> of data it requires.</p>
+
+<p>Just like an HTTP proxy or framework should not need to know about request
+parameters or headers it doesn&#39;t consume, an RPC framework shouldn&#39;t know about
+request scoped data the application needs.</p>
+
+<hr>
+
+<p>Let&#39;s try to look at specific ways this problem is (or could be) solved without
+involving context. As an example, let&#39;s look at the problem of writing an HTTP
+middleware. We want to be able to wrap an
+<a href="http://godoc.org/net/http#Handler">http.Handler</a> (or a variation thereof) in a
+way that allows the wrapper to attach data to a request.</p>
+
+<p>To get static type-safety we could try to add some type to our handlers. We
+could have a type containing all the data we want to keep request scoped and
+pass that through our handlers:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Data</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Username</span> <span class="kt">string</span>
+    <span class="nx">Log</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span>
+    <span class="c1">// …</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">HandleA</span><span class="p">(</span><span class="nx">d</span> <span class="nx">Data</span><span class="p">,</span> <span class="nx">res</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// …</span>
+    <span class="nx">d</span><span class="p">.</span><span class="nx">Username</span> <span class="p">=</span> <span class="s">&quot;admin&quot;</span>
+    <span class="nx">HandleB</span><span class="p">(</span><span class="nx">d</span><span class="p">,</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span>
+    <span class="c1">// …</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">HandleB</span><span class="p">(</span><span class="nx">d</span> <span class="nx">Data</span><span class="p">,</span> <span class="nx">res</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// …</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>However, this would prevent us from writing reusable Middleware. Any such
+middleware would need to make it possible to wrap <code>HandleA</code>. But as it&#39;s
+supposed to be reusable, it can&#39;t know the type of the Data parameter. You
+could make the <code>Data</code> parameter an <code>interface{}</code> and require type-assertion.
+But that wouldn&#39;t allow the middleware to inject its own data. You might think
+that interface type-assertions could solve this, but they have <a href="https://blog.merovius.de/2017/07/30/the-trouble-with-optional-interfaces.html">their own set
+of problems</a>.
+In the end, this approach won&#39;t bring you actual additional type safety.</p>
+
+<p>We could store our state keyed by requests. For example, an authentication
+middleware could do</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Authenticator</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">mu</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+    <span class="nx">users</span> <span class="kd">map</span><span class="p">[</span><span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">]</span><span class="kt">string</span>
+    <span class="nx">wrapped</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Handler</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">a</span> <span class="o">*</span><span class="nx">Authenticator</span><span class="p">)</span> <span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">res</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// …</span>
+    <span class="nx">a</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nx">Lock</span><span class="p">()</span>
+    <span class="nx">a</span><span class="p">.</span><span class="nx">users</span><span class="p">[</span><span class="nx">req</span><span class="p">]</span> <span class="p">=</span> <span class="s">&quot;admin&quot;</span>
+    <span class="nx">a</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nx">Unlock</span><span class="p">()</span>
+    <span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">a</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nx">Lock</span><span class="p">()</span>
+        <span class="nb">delete</span><span class="p">(</span><span class="nx">a</span><span class="p">.</span><span class="nx">users</span><span class="p">,</span> <span class="nx">req</span><span class="p">)</span>
+        <span class="nx">a</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nx">Unlock</span><span class="p">()</span>
+    <span class="p">}()</span>
+    <span class="nx">a</span><span class="p">.</span><span class="nx">wrapped</span><span class="p">.</span><span class="nx">ServeHTTP</span><span class="p">(</span><span class="nx">res</span><span class="p">,</span> <span class="nx">req</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">a</span> <span class="o">*</span><span class="nx">Authenticator</span><span class="p">)</span> <span class="nx">Username</span><span class="p">(</span><span class="nx">req</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="nx">a</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nx">Lock</span><span class="p">()</span>
+    <span class="k">defer</span> <span class="nx">a</span><span class="p">.</span><span class="nx">mu</span><span class="p">.</span><span class="nx">Unlock</span><span class="p">()</span>
+    <span class="k">return</span> <span class="nx">a</span><span class="p">.</span><span class="nx">users</span><span class="p">[</span><span class="nx">req</span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This has <em>some</em> advantages over context:</p>
+
+<ul>
+<li>It is more type-safe.</li>
+<li>While we still can&#39;t express a requirement on an authenticated user
+statically, we <em>can</em> express a requirement on an <code>Authenticator</code></li>
+<li>It&#39;s not susceptible to name-collisions anymore.</li>
+</ul>
+
+<p>However, we bought this with shared mutable state and the associated lock
+contention. It can also break in subtle ways, if one of the intermediate
+handlers decides to create a new Request - as
+<a href="https://github.com/golang/go/blob/816deacc70f48d14638104e284b3b75d5b1e8036/src/net/http/server.go#L1946">http.StripPrefix</a>
+is going to do soon.</p>
+
+<p>Lastly, we might consider to store this data in the
+<a href="http://godoc.org/net/http#Request">*http.Request</a> itself, for example by
+adding it as a stringified <a href="http://godoc.org/net/url#URL.RawQuery">URL parameter</a>.
+This too has several downsides, though. In fact it checks almost every single
+item from our list of downsides of <code>context.Context</code>. The exception is being a
+linked list. But even that advantage we buy with a lack of thread safety. If
+that request is passed to a handler in a different goroutine we get into
+trouble.</p>
+
+<p><em>(Side note: All of this also gives us a good idea of why the context package
+is implemented as a linked list. It allows all the data stored in it to be
+read-only and thus inherently thread-safe. There will never be any
+lock-contention around the shared state saved in a context.Context, because
+there will never be any need for locks)</em></p>
+
+<p>So we see that it is really hard (if not impossible) to solve this problem of
+having data attached to requests in independently executing handlers while also
+doing significantly better than with <code>context.Value</code>. Whether you believe this
+a problem worth solving or not is debatable. But <em>if</em> you want to get this kind
+of scalable abstraction you will have to rely on <em>something</em> like
+<code>context.Value</code>.</p>
+
+<hr>
+
+<p>No matter whether you are now convinced of the usefulness of <code>context.Value</code> or
+still doubtful: The disadvantages can clearly not be ignored in either case.
+But we can try to find a way to improve on it. To eliminate some of the
+disadvantages while still keeping its useful attributes.</p>
+
+<p>One way to do that (in Go 2) would be to introduce <a href="https://en.wikipedia.org/wiki/Scope_(computer_science)#Dynamic_scoping">dynamically scoped</a>
+variables. Semantically, each dynamically scoped variable represents a separate
+stack. Every time you change its value the new one is pushed to the stack.  It
+is pop&#39;ed off again after your function returns. For example:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// Let&#39;s make up syntax! Only a tiny bit, though.</span>
+<span class="nx">dyn</span> <span class="nx">x</span> <span class="p">=</span> <span class="mi">23</span>
+
+<span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Foo:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Bar</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Bar:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+    <span class="nx">x</span> <span class="p">=</span> <span class="mi">42</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Bar:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+    <span class="nx">Baz</span><span class="p">()</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Bar:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Baz</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Baz:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+    <span class="nx">x</span> <span class="p">=</span> <span class="mi">1337</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;Baz:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;main:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+    <span class="nx">Foo</span><span class="p">()</span>
+    <span class="nx">Bar</span><span class="p">()</span>
+    <span class="nx">Baz</span><span class="p">()</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="s">&quot;main:&quot;</span><span class="p">,</span> <span class="nx">x</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="c1">// Output:</span>
+<span class="nx">main</span><span class="p">:</span> <span class="mi">23</span>
+<span class="nx">Foo</span><span class="p">:</span> <span class="mi">23</span>
+<span class="nx">Bar</span><span class="p">:</span> <span class="mi">23</span>
+<span class="nx">Bar</span><span class="p">:</span> <span class="mi">42</span>
+<span class="nx">Baz</span><span class="p">:</span> <span class="mi">42</span>
+<span class="nx">Baz</span><span class="p">:</span> <span class="mi">1337</span>
+<span class="nx">Bar</span><span class="p">:</span> <span class="mi">42</span>
+<span class="nx">Baz</span><span class="p">:</span> <span class="mi">23</span>
+<span class="nx">Baz</span><span class="p">:</span> <span class="mi">1337</span>
+<span class="nx">main</span><span class="p">:</span> <span class="mi">23</span>
+</code></pre></div>
+<p>There are several notes about what I would imagine the semantics to be here.</p>
+
+<ul>
+<li>I would only allow <code>dyn</code>-declarations at package scope. Given that there is
+no way to refer to a local identifier of a different function, that seems
+logical.</li>
+<li>A newly spawned goroutine would inherit the dynamic values of its parent
+function. If we implement them (like <code>context.Context</code>) via linked lists, the
+shared data will be read-only. The head-pointer would need to be stored in
+some kind of goroutine-local storage. Thus, writes only ever modify this
+local storage (and the global heap), so wouldn&#39;t need to be synchronized
+specifically.</li>
+<li>The dynamic scoping would be independent of the package the variable is
+declared in. That is, if <code>foo.A</code> modifies a dynamic <code>bar.X</code>, then that
+modification is visible to all subsequent callees of <code>foo.A</code>, whether they
+are in <code>bar</code> or not.</li>
+<li>Dynamically scoped variables would likely not be addressable. Otherwise we&#39;d
+loose concurrency safety and the clear &quot;down-stack&quot; semantics of dynamic
+scoping. It would still be possible to declare <code>dyn x *int</code> though and thus
+get mutable state to pass on.</li>
+<li>The compiler would allocate the necessary storage for the stacks, initialized
+to their initializers and emit the necessary instructions to push and pop
+values on writes and returns. To account for panics and early returns, a
+mechanism like <code>defer</code> would be needed.</li>
+<li>There is some confusing overlap with package-scoped variables in this design.
+Most notably, from seeing <code>foo.X = Y</code> you wouldn&#39;t be able to tell whether
+<code>foo.X</code> is dynamically scoped or not. Personally, I would address that by
+removing package-scoped variables from the language. They could still be
+emulated by declaring a dynamically-scoped pointer and never modifying it.
+It&#39;s pointee is then a shared variable. But most usages of package-scoped
+variables would probably just use dynamically scoped variables.</li>
+</ul>
+
+<p>It is instructive to see, how this design would fare against the list of
+disadvantages identified for <code>context</code>.</p>
+
+<ul>
+<li>API clutter would be removed, as request-scoped data would now be
+part of the language without needing explicit passing.</li>
+<li>Dynamically scoped variables are statically type-safe. Every <code>dyn</code>
+declaration has an unambiguous type.</li>
+<li>It would still not be possible to express critical dependencies on
+dynamically scoped variables but they also couldn&#39;t be <em>absent</em>. At worst
+they&#39;ll have their zero value.</li>
+<li>Name collision is eliminated. Identifiers are, just like variable names,
+properly scoped.</li>
+<li>While a naive implementation would still use linked lists, they wouldn&#39;t be
+inefficient. Every <code>dyn</code> declaration gets its own list and only the
+head-pointer ever needs to be operated on.</li>
+<li>The design is still &quot;magic&quot; to a degree. But that &quot;magic&quot; is problem-inherent
+(at least if I understand the criticism correctly). The magic is exactly the
+possibility to pass values transparently through API boundaries.</li>
+</ul>
+
+<p>Lastly, I&#39;d like to mention cancellation. While the author of above post
+dedicates most of it to cancellation, I have so far mostly ignored it.  That&#39;s
+because I believe cancellation to be trivially implementable on top of a good
+<code>context.Value</code> implementation. For example:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// $GOROOT/src/done</span>
+<span class="kn">package</span> <span class="nx">done</span>
+
+<span class="c1">// C is closed when the current execution context (e.g. request) should be</span>
+<span class="c1">// cancelled.</span>
+<span class="nx">dyn</span> <span class="nx">C</span> <span class="o">&lt;-</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}</span>
+
+<span class="c1">// CancelFunc returns a channel that gets closed, when C is closed or cancel is</span>
+<span class="c1">// called.</span>
+<span class="kd">func</span> <span class="nx">CancelFunc</span><span class="p">()</span> <span class="p">(</span><span class="nx">c</span> <span class="o">&lt;-</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">,</span> <span class="nx">cancel</span> <span class="kd">func</span><span class="p">())</span> <span class="p">{</span>
+    <span class="c1">// Note: We can&#39;t modify C here, because it is dynamically scoped, which is</span>
+    <span class="c1">// why we return a new channel that the caller should store.</span>
+    <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">)</span>
+
+    <span class="kd">var</span> <span class="nx">o</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Once</span>
+    <span class="nx">cancel</span> <span class="p">=</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="nx">o</span><span class="p">.</span><span class="nx">Do</span><span class="p">(</span><span class="nb">close</span><span class="p">(</span><span class="nx">ch</span><span class="p">))</span> <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">C</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+            <span class="o">&lt;-</span><span class="nx">C</span>
+            <span class="nx">cancel</span><span class="p">()</span>
+        <span class="p">}()</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">ch</span><span class="p">,</span> <span class="nx">cancel</span>
+<span class="p">}</span>
+
+<span class="c1">// $GOPATH/example.com/foo</span>
+<span class="kn">package</span> <span class="nx">foo</span>
+
+<span class="kd">func</span> <span class="nx">Foo</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">cancel</span> <span class="kd">func</span><span class="p">()</span>
+    <span class="nx">done</span><span class="p">.</span><span class="nx">C</span><span class="p">,</span> <span class="nx">cancel</span> <span class="p">=</span> <span class="nx">done</span><span class="p">.</span><span class="nx">CancelFunc</span><span class="p">()</span>
+    <span class="k">defer</span> <span class="nx">cancel</span><span class="p">()</span>
+    <span class="c1">// Do things</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This cancellation mechanism would now be usable from any library that wants it
+without needing any explicit support in its API. This would also make it easy
+to add cancellation capabilities retroactively.</p>
+
+<hr>
+
+<p>Whether you <em>like</em> this design or not, it demonstrates that we shouldn&#39;t rush
+to calling for the removal of <code>context</code>. Removing it is only one possible
+solution to its downsides.</p>
+
+<p>If the removal of <code>context.Context</code> actually comes up, the question we should
+ask is &quot;do we want a canonical way to manage request-scoped values and at what
+cost&quot;.  Only then should we ask what the best implementation of this would be
+or whether to remove the current one.</p>
+
+</article>
+
+    </main>
+
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
+        </div>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
+</html>

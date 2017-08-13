@@ -69,3 +69,8 @@ code {
 		width: 100%;
 	}
 }
+
+article > ul:not(.browser-default) li {
+	list-style-type: initial;
+	margin-left: 2em;
+}
