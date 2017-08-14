@@ -310,8 +310,8 @@ There are several notes about what I would imagine the semantics to be here.
   Its pointee is then a shared variable. But most usages of package-scoped
   variables would probably just use dynamically scoped variables.
 
-It is instructive to see, how this design would fare against the list of
-disadvantages identified for `context`.
+It is instructive to compare this design against the list of disadvantages
+identified for `context`.
 
 * API clutter would be removed, as request-scoped data would now be
   part of the language without needing explicit passing.
