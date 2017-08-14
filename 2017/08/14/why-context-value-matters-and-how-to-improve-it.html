@@ -326,12 +326,12 @@ Most notably, from seeing <code>foo.X = Y</code> you wouldn&#39;t be able to tel
 <code>foo.X</code> is dynamically scoped or not. Personally, I would address that by
 removing package-scoped variables from the language. They could still be
 emulated by declaring a dynamically-scoped pointer and never modifying it.
-It&#39;s pointee is then a shared variable. But most usages of package-scoped
+Its pointee is then a shared variable. But most usages of package-scoped
 variables would probably just use dynamically scoped variables.</li>
 </ul>
 
-<p>It is instructive to see, how this design would fare against the list of
-disadvantages identified for <code>context</code>.</p>
+<p>It is instructive to compare this design against the list of disadvantages
+identified for <code>context</code>.</p>
 
 <ul>
 <li>API clutter would be removed, as request-scoped data would now be
