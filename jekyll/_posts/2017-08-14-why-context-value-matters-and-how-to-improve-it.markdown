@@ -307,7 +307,7 @@ There are several notes about what I would imagine the semantics to be here.
   `foo.X` is dynamically scoped or not. Personally, I would address that by
   removing package-scoped variables from the language. They could still be
   emulated by declaring a dynamically-scoped pointer and never modifying it.
-  It's pointee is then a shared variable. But most usages of package-scoped
+  Its pointee is then a shared variable. But most usages of package-scoped
   variables would probably just use dynamically scoped variables.
 
 It is instructive to see, how this design would fare against the list of
