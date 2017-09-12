@@ -46,6 +46,11 @@ img {
               0 3px 6px rgba(0,0,0,0.23);
 }
 
+img.small {
+  width: 30%;
+  margin: 1em 35%;
+}
+
 pre {
   padding: 1em;
   margin: 2em 10%;
@@ -62,6 +67,11 @@ code {
 	img {
 		margin: 1em 0;
 		width: 100%;
+	}
+
+	img.small {
+		margin: 1em 10%;
+		width: 80%;
 	}
 
 	pre {
