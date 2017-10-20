@@ -2,7 +2,7 @@
 layout: post
 title: "A day in the life of an Omnivore"
 tldr: "I take a toung-in-cheek look at how I imagine the life of a meat eater to look. At least based on my own experience."
-date: 2017-10-20 18:37:19
+date: 2017-10-20 23:45:00
 ---
 
 You get an E-Mail. It's an invite to a team dinner. As you have only recently
