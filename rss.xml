@@ -8,7 +8,7 @@
     <title>Between a rock and a crazy place</title>
     <link>//blog.merovius.de/</link>
     <description>RSS feed for Between a rock and a crazy place</description>
-    <pubDate>Fri, 20 Oct 2017 18:37:19 +0000</pubDate>
+    <pubDate>Fri, 20 Oct 2017 23:45:00 +0000</pubDate>
     <item>
       <title>A day in the life of an Omnivore</title>
       <link>//blog.merovius.de//2017/10/20/a-day-in-the-life-of-an-omnivore.html</link>
@@ -21,7 +21,7 @@ you know, the first dinner with new people also means you are going to have
 the conversation again. You know it will come up, whether you want to or not.
 Because you had it a thousand times - because you are an Omnivore.
 ]]></description>
-      <pubDate>Fri, 20 Oct 2017 18:37:19 +0000</pubDate>
+      <pubDate>Fri, 20 Oct 2017 23:45:00 +0000</pubDate>
       <guid>//blog.merovius.de//2017/10/20/a-day-in-the-life-of-an-omnivore.html</guid>
       <content:encoded><![CDATA[You get an E-Mail. It's an invite to a team dinner. As you have only recently
 joined this team, it's going to be your first. How exciting! You look forward
@@ -157,7 +157,7 @@ coincidental.*
 *Also, if we had "the conversation" before, you should know I still love you and
 don't judge you :) It's just that I had it a thousand times :)*
 ]]></content:encoded>
-      <dc:date>2017-10-20T18:37:19+00:00</dc:date>
+      <dc:date>2017-10-20T23:45:00+00:00</dc:date>
     </item>
     <item>
       <title>Diminishing returns of static typing</title>
@@ -4433,6 +4433,6 @@ So this is finally the relaunch of my blog. Yay for me.
 ]]></content:encoded>
       <dc:date>2013-09-28T02:08:05+00:00</dc:date>
     </item>
-    <dc:date>2017-10-20T18:37:19+00:00</dc:date>
+    <dc:date>2017-10-20T23:45:00+00:00</dc:date>
   </channel>
 </rss>
