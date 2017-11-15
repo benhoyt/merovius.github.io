@@ -4,7 +4,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
   <title>Between a rock and a crazy place</title>
-  <link href="http://blog.merovius.de/"/>
+  <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="{{ site.url }}/atom.xml"/>
   <updated>{{ site.time | date_to_xmlschema }}</updated>
   <id>{{ site.url }}</id>
