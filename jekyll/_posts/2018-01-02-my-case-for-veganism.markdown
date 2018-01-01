@@ -247,7 +247,7 @@ The main problem is working around the social issues associated with it -
 dealing with people who are unwilling to be accommodating, having to
 justify/discuss my choice or just exposing something about my person I might
 prefer to keep private. Basically, I wrote
-[a whole thing about this](//2017/10/20/a-day-in-the-life-of-an-omnivore.html).
+[a whole thing about this](https://blog.merovius.de/2017/10/20/a-day-in-the-life-of-an-omnivore.html).
 
 But this is simply one of those downsides I chose to accept. Nobody said
 going vegan wouldn't come with sacrifices.
