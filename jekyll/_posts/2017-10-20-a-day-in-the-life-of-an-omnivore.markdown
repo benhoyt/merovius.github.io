@@ -2,6 +2,7 @@
 layout: post
 title: "A day in the life of an Omnivore"
 tldr: "I take a toung-in-cheek look at how I imagine the life of a meat eater to look. At least based on my own experience."
+tags: ["personal", "veganism"]
 date: 2017-10-20 23:45:00
 ---
 
