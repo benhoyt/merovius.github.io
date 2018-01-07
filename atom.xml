@@ -4,12 +4,651 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-01-07T23:41:29+00:00</updated>
+  <updated>2018-01-07T23:43:18+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
   </author>
 
+  
+  <entry>
+    <id>https://blog.merovius.de//2018/01/08/monads-are-just-monoids</id>
+    <link type="text/html" rel="alternate" href="https://blog.merovius.de//2018/01/08/monads-are-just-monoids.html"/>
+    <title>Monads are just monoids in the category of endofunctors</title>
+    <updated>2018-01-08T00:30:00+00:00</updated>
+    <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: I explain the mathematical background of a joke-explanation of monads. Contains lots of math and a hasty introduction to category theory.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;There is a running gag in the programming community, that newcomers will often
+be confused by the concept of monads (which are sequential computations are
+modeled in purely functional languages) and getting the explanation &amp;quot;it is
+simple, really: Monads are just monoids in the category of endofunctors&amp;quot;. This
+is not meant as an actual explanation, but rather to poke a bit of fun at the
+habit of functional programmers to give quite abstract and theoretical
+explanations at times, that are not all that helpful.&lt;/p&gt;
+
+&lt;p&gt;However, given my background in mathematics, I decided that I wanted to
+actually approach Haskell from this point of view: I am interested in how it
+uses math to model programming and also to, after several years of doing mostly
+engineering focused programming work, flex my math muscles again
+- as there is quite a bit of interesting math behind these concepts.&lt;/p&gt;
+
+&lt;p&gt;The quote is from a pretty popular &lt;a href=&quot;http://www.maths.ed.ac.uk/%7Eaar/papers/maclanecat.pdf&quot;&gt;book about category
+theory&lt;/a&gt; and is, in full:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;All told, a monad in \(X\) is just a monoid in the category of endofunctors
+of \(X\), with product \(\times\) replaced by composition of endofunctors
+and unit set by the identity endofunctor.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;This, of course, is an explanation of the &lt;em&gt;mathematical&lt;/em&gt; concept of monads,
+not meant for programmers. Most explanations of the quote that I found either
+assumed quite a bit of knowledge in Haskell or took a lot of liberties with the
+mathematical concepts (and relied a lot on &amp;quot;squinting&amp;quot;) or both. This write up
+is my attempt, to walk through all the concepts needed to explain monads as a
+mathematical concept and how it relates to Haskell - with as little squinting
+as possible.&lt;/p&gt;
+
+&lt;p&gt;Of course, there are a couple of disclaimers, I should start with:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;This is not the best way to understand what monads are, if you are actually
+interested in using them to program. In fact, it is literally the worst way.
+I would recommend &lt;a href=&quot;http://homepages.inf.ed.ac.uk/wadler/papers/marktoberdorf/baastad.pdf&quot;&gt;this intro&lt;/a&gt;,
+which takes a much more practical approach.&lt;/li&gt;
+&lt;li&gt;This is not the best way to understand how category theory works, if you are
+actually interested in learning mathematics. In fact, it is literally the
+worst way. I would recommend &lt;a href=&quot;http://www.maths.ed.ac.uk/%7Eaar/papers/maclanecat.pdf&quot;&gt;the book the quote is from&lt;/a&gt;,
+it&amp;#39;s quite good (but assumes a math audience).&lt;/li&gt;
+&lt;li&gt;I haven&amp;#39;t done mathematics in years. I also don&amp;#39;t know much Haskell either.
+So I might be getting a bunch of stuff wrong to varying degrees. I&amp;#39;m sure I
+will hear all about it :)&lt;/li&gt;
+&lt;li&gt;Even if I would &lt;em&gt;understand&lt;/em&gt; everything correctly, there are still a lot of
+details, mostly of technical nature, I had to omit, to keep this &amp;quot;short&amp;quot;.
+Not that it is short.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Originally, I intended this to be the ultimate explanation, which would teach
+Haskellers category theory, mathematicians Haskell and people who know neither
+both. Unsurprisingly, this is not what this is, at all. It ended up mostly a
+write up to assure myself that I understood the path myself. If anything, you
+can treat this as a kind of &amp;quot;reading companion&amp;quot;: If you want to understand this
+topic of the intersection between category theory and Functional Programming,
+this post can lead you through the correct terms to search for and give you a
+good idea what to focus on, in the respective Wikipedia articles.&lt;/p&gt;
+
+&lt;p&gt;With all that out of the way, let&amp;#39;s begin.&lt;/p&gt;
+
+&lt;h5 id=&quot;categories&quot;&gt;Categories&lt;/h5&gt;
+
+&lt;p&gt;In mathematics, a category is (roughly) a collection of objects and a
+collection of arrows between them. There is not a lot of meaning behind these,
+but it will probably help you to think of objects as sets and arrows as
+mappings.  Every arrow goes from an object (the &lt;em&gt;domain&lt;/em&gt;) to an object (the
+&lt;em&gt;codomain&lt;/em&gt;) and we write an arrow as \(f:X\to Y\), where \(f\) is the name
+of the arrow, \(X\) is the domain and \(Y\) is the codomain. Just like with
+mappings, there can be many arrows between any given pair of objects - or there
+may be none.&lt;/p&gt;
+
+&lt;p&gt;We do need &lt;em&gt;some&lt;/em&gt; restrictions: First, we require a specific &lt;em&gt;identity&lt;/em&gt; arrow
+\(\mathrm{id}:X\to X\) attached to every object \(X\), which has \(X\) as
+both domain and codomain. Secondly, we require (some) arrows to be
+&lt;em&gt;composable&lt;/em&gt;. That is if we have two arrows \(f:X\to Y,g:Y\to Z\) - so,
+whenever the codomain of \(g\) is the domain of \(f\) - there should also
+be a composed arrow&lt;a href=&quot;#footnote1&quot;&gt;¹&lt;/a&gt;&lt;a id=&quot;footnote1_back&quot;&gt;&lt;/a&gt;
+\(g\circ f: X\to Z\), that shares the domain with \(f\) and the codomain with
+\(g\).&lt;/p&gt;
+
+&lt;p&gt;Furthermore, the identity arrows must act as a &lt;em&gt;unit&lt;/em&gt; for composition, that is,
+they arrow \(f\) we require \(\mathrm{id}\circ f = f = f
+\circ\mathrm{id}\). We also require composition to be &lt;em&gt;associative&lt;/em&gt;, that is
+\((f\circ g)\circ h = f\circ(g\circ h)\) (whenever all compositions exist)&lt;a href=&quot;#footnote2&quot;&gt;²&lt;/a&gt;&lt;a id=&quot;footnote2_back&quot;&gt;&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;When we talk about a category, we often draw diagrams like this:&lt;/p&gt;
+
+&lt;div&gt;
+\[
+\require{AMScd}
+
+\begin{CD}
+X       @&gt;{f}&gt;&gt; Y       \\
+@V{g}VV         @VV{p}V \\
+Z       @&gt;&gt;{q}&gt; W       \\
+\end{CD}
+\]
+&lt;/div&gt;
+
+&lt;p&gt;They show some of the objects and arrows from the category in a compact way.
+This particular diagram indicates that there are four objects and four arrows
+involved, with obvious domains and codomains. We only draw a subset of the
+objects and arrows, that is interesting for the point we are trying to make -
+for example, above diagram could also contain, of course, identity arrows and
+compositions \(p\circ f\) and \(q\circ g\)), but we didn&amp;#39;t draw them. In
+a square like this, we can take two paths from \(X\) to \(W\). If these
+paths are identical (that is, \(p\circ f = q\circ g\), we say that the
+square &lt;em&gt;commutes&lt;/em&gt;. A &lt;em&gt;commutative&lt;/em&gt; diagram is a diagram, in which any square
+commutes, that is, it does not matter which path we take from any object to
+another. Most of the time, when we draw a diagram, we intend it to be
+commutative.&lt;/p&gt;
+
+&lt;p&gt;So, to summarize, to define a mathematical category, we need to:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Specify what our objects are&lt;/li&gt;
+&lt;li&gt;Specify what our arrows are, where each arrow starts and ends at a certain
+object&lt;/li&gt;
+&lt;li&gt;This collection of arrows need to include an arrow \(\mathrm{id}_X\) for
+every object \(X\), which starts and ends at \(X\)&lt;/li&gt;
+&lt;li&gt;And we need to be able to glue together arrows \(f:X\to Y\) and \(g:Y\to
+Z\) to an arrow \(g\circ f: X\to Z\)&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;In Haskell, we work on the category &lt;strong&gt;Hask&lt;/strong&gt;, which consists of:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;The objects are &lt;em&gt;types&lt;/em&gt;: &lt;code&gt;Int&lt;/code&gt; is an object, &lt;code&gt;String&lt;/code&gt; is an object but also
+&lt;code&gt;Int | String&lt;/code&gt;, &lt;code&gt;String -&amp;gt; Int&lt;/code&gt; and any other complicated type you can think
+of.&lt;/li&gt;
+&lt;li&gt;The arrows are &lt;em&gt;functions&lt;/em&gt;: &lt;code&gt;f :: a -&amp;gt; b&lt;/code&gt; is a function taking an &lt;code&gt;a&lt;/code&gt; as an
+input and returning a &lt;code&gt;b&lt;/code&gt; and is represented by an arrow &lt;code&gt;f&lt;/code&gt;, which has &lt;code&gt;a&lt;/code&gt;
+as its domain and &lt;code&gt;b&lt;/code&gt; as its codomain.  So, for example, &lt;code&gt;length :: String
+-&amp;gt; Int&lt;/code&gt; would start at the type &lt;code&gt;String&lt;/code&gt; and end at &lt;code&gt;Int&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Haskell has a function &lt;code&gt;id :: a -&amp;gt; a&lt;/code&gt; which gives us the identity arrow
+for any type &lt;code&gt;a&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;We can compose functions with the operator &lt;code&gt;(.) :: (b -&amp;gt; c) -&amp;gt; (a -&amp;gt; b) -&amp;gt;
+(a -&amp;gt; c)&lt;/code&gt;. Note, that this follows the swapped notation of \(\circ\), where
+the input type of the left function is the output type of the right function.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;In general, category theory is concerned with the &lt;em&gt;relationship between&lt;/em&gt;
+categories, whereas in functional programming, we usually only deal with this
+one category. This turns out to be both a blessing and a curse: It means that
+our object of study is much simpler, but it also means, that it is sometimes
+hard to see how to apply the general concepts to the limited environment of
+functional programming.&lt;/p&gt;
+
+&lt;h5 id=&quot;monoids&quot;&gt;Monoids&lt;/h5&gt;
+
+&lt;p&gt;Understanding categories puts us in the position to understand &lt;em&gt;monoids&lt;/em&gt;. A
+monoid is the generalized structure underlying concepts like the natural
+numbers: We can &lt;em&gt;add&lt;/em&gt; two natural numbers, but we can&amp;#39;t (in general) &lt;em&gt;subtract&lt;/em&gt;
+them, as there are no negative numbers. We also have the number \(0\), which,
+when added to any number, does nothing - it acts as a &lt;em&gt;unit&lt;/em&gt; for addition. And
+we also observe, that addition is &lt;em&gt;associative&lt;/em&gt;, that is, when doing a bunch of
+additions, the order we do them in doesn&amp;#39;t matter.&lt;/p&gt;
+
+&lt;p&gt;The same properties also apply to other constructs. For example, if we take all
+maps from a given set to itself, they can be composed and that composition is
+associative and there is a unit element (the identity map).&lt;/p&gt;
+
+&lt;p&gt;This provides us with the following elements to define a monoid:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;A set \(M\)&lt;/li&gt;
+&lt;li&gt;An operation \(\star\colon M\times M\to M\), which &amp;quot;adds&amp;quot; together two elements to
+make a new one&lt;/li&gt;
+&lt;li&gt;We need a special unit element \(u\in M\), which acts neutrally when added to
+any other element, that is \(m\star u=m=u\star m\)&lt;/li&gt;
+&lt;li&gt;The operation needs to be associative, that is we always require
+\(m\star(n\star k)=(m\star n)\star k\)&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;There is another way to frame this, which is closer in line with category theory.
+If we take \(1 := \{0\}\) to be a 1-element set, we can see that the
+elements of \(M\) are in a one-to-one correspondence to functions \(1\to M\):
+Every such function chooses an element of \(M\) (the image of \(0\)) and
+every element \(m\in M\) fixes such a function, by using \(f(0) := m\).
+Thus, instead of saying &amp;quot;we need a special element of \(M\)&amp;quot;, we can also
+choose a special &lt;em&gt;function&lt;/em&gt; \(\eta: 1\to M\). And instead of talking about an
+&amp;quot;operation&amp;quot;, we can talk about a function \(\mu: M\times M\to M\). Which
+means, we can define a monoid via a commutative diagram like so:&lt;/p&gt;
+
+&lt;div&gt;
+\[
+\begin{CD}
+1 \\
+@V{\eta}VV \\
+M \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+M\times M \\
+@V{\mu}VV \\
+M \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+M\times 1 @&gt;{\mathrm{id}\times\eta}&gt;&gt; M\times M @&lt;{\eta\times\mathrm{id}}&lt;&lt; 1\times M \\
+@V{\pi_1}VV                           @V{\mu}VV                             @V{\pi_2}VV \\
+M         @&gt;{\mathrm{id}}&gt;&gt;           M         @&lt;{\mathrm{id}}&lt;&lt;           M \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+M\times M\times M @&gt;{\mu\times\mathrm{id}}&gt;&gt; M\times M \\
+@V{\mathrm{id}\times\mu}VV                   @V{\mu}VV \\
+M\times M         @&gt;{\mu}&gt;&gt;                  M \\
+\end{CD}
+
+\]
+&lt;/div&gt;
+
+&lt;p&gt;\(\pi_1\) and \(\pi_2\) here, are the functions that project to the first
+or second component of a cross product respectively (that is \(\pi_1(a, b) :=
+a, \pi_2(a, b) := b\)) and e.g. \(\mathrm{id}\times\eta\) is the map that
+applies \(\mathrm{id}\) to the first component of a cross-product and
+\(\eta\) to the second: \(\mathrm{id}\times\eta(m, 0) = (m, \eta(0))\).&lt;/p&gt;
+
+&lt;p&gt;There are four sub-diagrams here:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;The first diagram just says, that we need an arrow \(\eta:1\to M\). This
+chooses a unit element for us.&lt;/li&gt;
+&lt;li&gt;Likewise, the second diagram just says, that we need an arrow
+\(\mu:M\times M\to M\). This is the operation.&lt;/li&gt;
+&lt;li&gt;The third diagram tells us that the chosen by \(\eta\) should be a unit
+for \(\mu\). The commutativity of the left square tells us, that it should
+be right-neutral, that is
+\[ \forall m\in M: m = \pi_1(m, 0) = \mu(\mathrm{id}\times\eta(m, 0)) = \mu(m, \eta(0)) \]
+and the commutativity of the right square tells us, that it should be left-neutral, that is
+\[ \forall m\in M: m = \pi_2(0,m) = \mu(\eta\times\mathrm{id}(0, m)) = \mu(\eta(0), m) \]&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Thus, the first diagram is saying that the element chosen by \(\eta\) should
+act like a unit. For example, the left square says&lt;/p&gt;
+
+&lt;p&gt;\[\pi_1(m,0) = \mu((\mathrm{id}\times\eta)(m,0)) = \mu(m,\eta(0))\]&lt;/p&gt;
+
+&lt;p&gt;Now, writing \(\mu(m,n) = m\star n\) and \(\eta(0) = u\), this is equivalent to saying \(m = u\star m\).&lt;/p&gt;
+
+&lt;p&gt;The second diagram is saying that \(\mu\) should be associative: The top arrow
+combines the first two elements, the left arrow combines the second two. The right and
+bottom arrows then combine the result with the remaining element respectively,
+so commutativity of that square means the familiar \(m\star (n\star k) = (m\star n)\star k\).&lt;/p&gt;
+
+&lt;p&gt;Haskell has the concept of a monoid too. While it&amp;#39;s not really relevant to the
+discussion, it might be enlightening to see, how it&amp;#39;s modeled. A monoid in
+Haskell is a type-class with two (required) methods:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-haskell&quot; data-lang=&quot;haskell&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kr&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;Monoid&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;where&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;mempty&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;mappend&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now, this gives us the operation (&lt;code&gt;mappend&lt;/code&gt;) and the unit (&lt;code&gt;a&lt;/code&gt;), but where are
+the requirements of associativity and the unit acting neutrally? The Haskell
+type system is unable to codify these requirements, so they are instead given
+as a &amp;quot;law&amp;quot;, that is, any implementation of a monoid is supposed to have these
+properties, to be manually checked by the programmer:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;mappend mempty x = x&lt;/code&gt; (the unit is left-neutral)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;mappend x mempty = x&lt;/code&gt; (the unit is right-neutral)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;mappend x (mappend y z) = mappend (mappend x y) z&lt;/code&gt; (the operation is associative)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h5 id=&quot;functors&quot;&gt;Functors&lt;/h5&gt;
+
+&lt;p&gt;I mentioned that category theory investigates the relationship between
+categories - but so far, everything we&amp;#39;ve seen only happens inside a single
+category. Functors are, how we relate categories to each other. Given two
+categories \(\mathcal{B}\) and \(\mathcal{C}\), a &lt;em&gt;functor&lt;/em&gt;
+\(F:\mathcal{B}\to \mathcal{C}\) assigns to every object \(X\) of
+\(\mathcal{B}\), an object \(F(X)\) of \(\mathcal{C}\). It also assigns
+to every arrow \(f:X\to Y\) in \(\mathcal{B}\) a corresponding arrow
+\(F(f): F(X)\to F(Y)\) in \(\mathcal{C}\)&lt;a href=&quot;#footnote3&quot;&gt;³&lt;/a&gt;&lt;a
+id=&quot;footnote3_back&quot;&gt;&lt;/a&gt;. So, a functor transfers arrows from one category
+to another, preserving domain and codomain. To actually preserve the
+structure, we also need it to preserve the extra requirements of a category,
+identities and composition. So we need, in total:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;An object map, \(F:O_\mathcal{B} \to O_\mathcal{C}\)&lt;/li&gt;
+&lt;li&gt;An arrow map, \(F:A_\mathcal{B}\to A_\mathcal{C}\), which preserves
+start and end object, that is the image of an arrow \(X\to Y\) starts at
+\(F(X)\) and ends at \(F(Y)\)&lt;/li&gt;
+&lt;li&gt;The arrow map has to preserve identities, that is \(F(\mathrm{id}_X) =
+\mathrm{id}_{F(X)}\)&lt;/li&gt;
+&lt;li&gt;The arrow map has to preserve composition, that is \(F(g\circ f) =
+F(g)\circ F(f)\).&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;A trivial example of a functor is the &lt;em&gt;identity functor&lt;/em&gt; (which we will call
+\(I\)), which assigns each object to itself and each arrow to itself - that
+is, it doesn&amp;#39;t change the category at all.&lt;/p&gt;
+
+&lt;p&gt;A simple example is the construction of the &lt;em&gt;free monoid&lt;/em&gt;, which maps from the
+category of sets to the category of monoids. The Free monoid \(S^*\) on a
+set \(S\) is the set of all finite length strings of elements of \(S\),
+with concatenation as the operation and the empty string as the unit. Our
+object map then assigns to each set \(S\) its free monoid \(S^*\). And our
+arrow map assigns to each function \(f:S\to T\) the function \(f^*:S^*\to
+T^*\), that applies \(f\) to each element of the input string.&lt;/p&gt;
+
+&lt;p&gt;There is an interesting side note here: Mathematicians love to abstract.
+Categories arose from the observation, that in many branches of mathematics we
+are researching some class of objects with some associated structure and those
+maps between them, that preserve this structure. It turns out that category
+theory is a branch of mathematics that is researching the objects of
+categories, with some associated structure (identity arrows and composition)
+and maps (functors) between them, that preserve that structure. So it seems
+obvious that we should be able to view categories &lt;em&gt;as objects of a category&lt;/em&gt;,
+with functors as arrows. Functors can be composed (in the obvious way) and
+every category has an identity functor, that just maps every object and arrow
+to itself.&lt;/p&gt;
+
+&lt;p&gt;Now, in Haskell, Functors are again a type class:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-haskell&quot; data-lang=&quot;haskell&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kr&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;Functor&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;where&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;fmap&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;This looks like our arrow map: It assigns to each function &lt;code&gt;g :: a -&amp;gt; b&lt;/code&gt; a
+function &lt;code&gt;fmap g :: f a -&amp;gt; f b&lt;/code&gt;. The object map is implicit: When we write &lt;code&gt;f a&lt;/code&gt;,
+we are referring to a new type, that depends on &lt;code&gt;a&lt;/code&gt; - so we &amp;quot;map&amp;quot; &lt;code&gt;a&lt;/code&gt; to &lt;code&gt;f a&lt;/code&gt;
+&lt;a href=&quot;#footnote4&quot;&gt;⁴&lt;/a&gt;&lt;a id=&quot;footnote4_back&quot;&gt;&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;Again, there are additional requirements the type system of Haskell can not
+capture. So we provide them as laws the programmer has to check manually:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;fmap id  ==  id&lt;/code&gt; (preserves identities)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;fmap (f . g)  ==  fmap f . fmap g&lt;/code&gt; (preserves composition)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;There is one thing to note here: As mentioned, in Haskell we only really deal
+with one category, the category of types. That means that a functor always maps
+from the category of types to &lt;em&gt;itself&lt;/em&gt;. In mathematics, we call such a functor,
+that maps a category to itself, an &lt;em&gt;endofunctor&lt;/em&gt;. So we can tell, that in
+Haskell, every functor is automatically an endofunctor.&lt;/p&gt;
+
+&lt;h5 id=&quot;natural-transformations&quot;&gt;Natural transformations&lt;/h5&gt;
+
+&lt;p&gt;We now understand categories and we understand functors. We also understand,
+that we can look at something like the category of categories. But the
+definition of a monad given to us talks about the &lt;em&gt;category of endofunctors&lt;/em&gt;.
+So we seem to have to step up yet another level in the abstraction hierarchy
+and somehow build this category. As objects, we&amp;#39;d like to have endofunctors -
+and arrows will be &lt;em&gt;natural transformations&lt;/em&gt;, which take one functor to
+another, while preserving its internal structure (the mapping of arrows). If
+that sounds complicated and abstract, that&amp;#39;s because it is.&lt;/p&gt;
+
+&lt;p&gt;We need two functors \(F,G:\mathcal{B}\to \mathcal{C}\) of the same &amp;quot;kind&amp;quot;
+(that is, mapping to and from the same categories). A natural transformation
+\(\eta:F\dot\to G\) assigns an arrow&lt;a href=&quot;#footnote5&quot;&gt;⁵&lt;/a&gt;&lt;a
+id=&quot;footnote5_back&quot;&gt;&lt;/a&gt; \(\eta_X: F(X)\to G(X)\) (called a &lt;em&gt;component&lt;/em&gt; of
+\(\eta\)) to every object in \(\mathcal{B}\). So a component \(\eta_X\)
+describes, how we can translate the action of \(F\) on \(X\) into the
+action of \(G\) on \(X\) - i.e. how to translate their object maps. We also
+have to talk about the translation of the arrow maps. For that, we observe that
+for any arrow \(f:X\to Y\) in \(\mathcal{B}\), we get four new arrows in
+\(\mathcal{C}\):&lt;/p&gt;
+
+&lt;div&gt;
+\[
+\begin{CD}
+X       \\
+@V{f}VV \\
+Y       \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+F(X)        @&gt;{\eta_X}&gt;&gt; G(X)       \\
+@V{F(f)}VV               @VV{G(f)}V \\
+F(Y)        @&gt;&gt;{\eta_Y}&gt; G(Y)       \\
+\end{CD}
+\]
+&lt;/div&gt;
+
+&lt;p&gt;For a natural transformation, we require the resulting square to commute.&lt;/p&gt;
+
+&lt;p&gt;So, to recap: To create a natural transformation, we need&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Two functors \(F,G:\mathcal{B}\to\mathcal{C}\)&lt;/li&gt;
+&lt;li&gt;For every object \(X\) in \(\mathcal{B}\), an arrow \(\eta_X: F(X)\to
+G(X)\)&lt;/li&gt;
+&lt;li&gt;The components need to be compatible with the arrow maps of the functors:
+\(\eta_Y\circ F(f) = G(f)\circ \eta_X\).&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;In Haskell, we can define a natural transformation like so:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-haskell&quot; data-lang=&quot;haskell&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kr&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Functor&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;Functor&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;g&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;Transformation&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;g&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;where&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;eta&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;g&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;f&lt;/code&gt; and &lt;code&gt;g&lt;/code&gt; are functors and a natural transformation from &lt;code&gt;f&lt;/code&gt; to &lt;code&gt;g&lt;/code&gt; provides
+a map &lt;code&gt;f a -&amp;gt; g a&lt;/code&gt; for every type &lt;code&gt;a&lt;/code&gt;. Again, the requirement of compatibility
+with the actions of the functors is not expressible as a type signature, but we
+can require it as a law:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;eta (fmap fn a) = fmap fn (eta a)&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h5 id=&quot;monads&quot;&gt;Monads&lt;/h5&gt;
+
+&lt;p&gt;This, finally, puts us in the position to define monads. Let&amp;#39;s look at our quote above:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;All told, a monad in \(X\) is just a monoid in the category of endofunctors
+of \(X\), with product \(\times\) replaced by composition of endofunctors
+and unit set by the identity endofunctor.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;It should be clear, how we can &lt;em&gt;compose&lt;/em&gt; endofunctors. But it is important,
+that this is a different view of these things than if we&amp;#39;d look at the category
+of categories - there, objects are categories and functors are arrows, while
+here, objects are &lt;em&gt;functors&lt;/em&gt; and arrows are natural transformations. That
+shows, how composition of functors can take the role of the cross-product of
+sets: In a set-category, the cross product makes a new set out of two other
+set. In the category of endofunctors, composition makes a new endofunctor out
+of two other endofunctors.&lt;/p&gt;
+
+&lt;p&gt;When we defined monoids diagrammatically, we also needed a cross product of
+mappings, that is, given a map \(f:X_1\to Y_1\) and a map \(g:X_2\to
+Y_2\), we needed the map \(f\times g: X_1\times X_2\to Y_1\times
+Y_2\), which operated on the individual constituents. If we want to replace
+the cross product with composition of endofunctors, we need an equivalent for
+natural transformations. That is, given two natural transformations
+\(\eta:F\to G\) and \(\epsilon:J\to K\), we want to construct a natural
+transformation \(\eta\epsilon:J\circ F\to K\circ G\). This diagram
+illustrates how we get there (working on components):&lt;/p&gt;
+
+&lt;div&gt;
+\[
+\begin{CD}
+F(X)    @&gt;{\eta_X}&gt;&gt;    G(X)                  @.                            \\
+@V{J}VV                 @VV{J}V               @.                            \\
+J(F(X)) @&gt;{J(\eta_X)}&gt;&gt; J(G(X))               @&gt;{\epsilon_{G(X)}}&gt;&gt; K(G(X)) \\
+\end{CD}
+\]
+&lt;/div&gt;
+
+&lt;p&gt;As we can see, we can build an arrow \(\epsilon_{G(X)}\circ J(\eta_X):
+J(F(X)) \to K(G(X))\), which we can use as the components of our natural
+transformation \(\eta\epsilon:J\circ F\to K\circ G\). This construction is
+called the &lt;em&gt;horizontal composition&lt;/em&gt; of natural transformations. We should
+verify that this is indeed a natural transformation - for now, let&amp;#39;s just
+accept that it follows from the naturality of \(\eta\) and \(\epsilon\).&lt;/p&gt;
+
+&lt;p&gt;Lastly, there is an obvious natural transformation taking a functor to itself;
+each component being just the identity arrow. We call that natural
+transformation \(\iota\), staying with the convention of using Greek letters
+for natural transformations.&lt;/p&gt;
+
+&lt;p&gt;With this, we can redraw the diagram we used to define monoids above, the
+replacements indicated by the quotes:&lt;/p&gt;
+
+&lt;div&gt;
+\[
+\begin{CD}
+I \\
+@V{\eta}VV \\
+M \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+M\circ M \\
+@V{\mu}VV \\
+M \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+M\circ I @&gt;{\iota\ \eta}&gt;&gt; M\circ M  @&lt;{\eta\ \iota}&lt;&lt; I\circ M \\
+@VVV                       @V{\mu}VV                   @VVV \\
+M        @&gt;{\iota}&gt;&gt;       M         @&lt;{\iota}&lt;&lt;       M \\
+\end{CD}
+
+\hspace{1em}
+
+\begin{CD}
+M\circ M\circ M @&gt;{\mu\ \iota}&gt;&gt; M\circ M  \\
+@V{\iota\ \mu}VV                 @V{\mu}VV \\
+M\circ M        @&gt;{\mu}&gt;&gt;      M         \\
+\end{CD}
+\]
+&lt;/div&gt;
+
+&lt;p&gt;The vertical arrows in the middle diagram now simply apply the composition of
+functors, using that the identity functor is a unit.&lt;/p&gt;
+
+&lt;p&gt;These diagrams encode these conditions on our natural transformations&lt;a href=&quot;#footnote6&quot;&gt;⁶&lt;/a&gt;&lt;a id=&quot;footnote6_back&quot;&gt;&lt;/a&gt;:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;\(\mu\circ\eta\iota = \mu = \iota\eta\circ\mu\), that is \(\eta\) serves as a unit&lt;/li&gt;
+&lt;li&gt;\(\mu\circ\mu\iota = \mu\circ\iota\mu\), that is \(\mu\) is associative&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;To recap, a monad, in category theory, is&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;An endofunctor \(M\)&lt;/li&gt;
+&lt;li&gt;A natural transformation \(\eta: I\to M\), which serves as an identity for
+horizontal composition.&lt;/li&gt;
+&lt;li&gt;A natural transformation \(\mu: M\circ M\to M\), which is associative in
+respect to horizontal composition.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Now, let&amp;#39;s see, how this maps to Haskell monads.&lt;/p&gt;
+
+&lt;p&gt;First, what is the identity functor in Haskell? As we pointed out above, the
+object function of functors is implicit, when we write &lt;code&gt;f a&lt;/code&gt; instead of &lt;code&gt;a&lt;/code&gt;. As
+such, the identity functor is simply &lt;code&gt;a&lt;/code&gt; - i.e. we map any type to itself.
+&lt;code&gt;fmap&lt;/code&gt; of that functor would thus also just be the identity
+&lt;code&gt;fmap :: (a -&amp;gt; a) -&amp;gt; (a -&amp;gt; a)&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;So, what would our natural transformation \(\eta\) look like? As we said, a
+natural transformation between two functors is just a map &lt;code&gt;f a -&amp;gt; g a&lt;/code&gt;. So (if
+we call our endofunctor &lt;code&gt;m&lt;/code&gt;) the identity transformation of our monoid is
+&lt;code&gt;eta :: a -&amp;gt; m a&lt;/code&gt;
+mapping the identity functor to &lt;code&gt;m&lt;/code&gt;. We also need our monoidal operation, which
+should map &lt;code&gt;m&lt;/code&gt; applied twice to &lt;code&gt;m&lt;/code&gt;:
+&lt;code&gt;mu :: m (m a) -&amp;gt; m a&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Now, Haskellers write &lt;code&gt;return&lt;/code&gt; instead of &lt;code&gt;eta&lt;/code&gt; and write &lt;code&gt;join&lt;/code&gt; instead of
+&lt;code&gt;mu&lt;/code&gt;, giving us the type class&lt;a href=&quot;#footnote7&quot;&gt;⁷&lt;/a&gt;&lt;a id=&quot;footnote7_back&quot;&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-haskell&quot; data-lang=&quot;haskell&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;kr&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;Functor&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;Monad&lt;/span&gt; &lt;span class=&quot;kr&quot;&gt;where&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;
+  &lt;span class=&quot;n&quot;&gt;join&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;As a last note, it is worth pointing out that you usually won&amp;#39;t implement
+&lt;code&gt;join&lt;/code&gt;, but instead a different function, called &amp;quot;monadic bind&amp;quot;:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-haskell&quot; data-lang=&quot;haskell&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;=&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The reason is, that this more closely maps to what monads are actually &lt;em&gt;used&lt;/em&gt;
+for in functional programming. But we can move between &lt;code&gt;join&lt;/code&gt; and &lt;code&gt;&amp;gt;&amp;gt;=&lt;/code&gt; via&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-haskell&quot; data-lang=&quot;haskell&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;=&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt;
+&lt;span class=&quot;nf&quot;&gt;v&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;join&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;fmap&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;v&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+
+&lt;span class=&quot;nf&quot;&gt;join&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;::&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;-&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;m&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;a&lt;/span&gt;
+&lt;span class=&quot;nf&quot;&gt;join&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;v&lt;/span&gt; &lt;span class=&quot;ow&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;v&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h5 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h5&gt;
+
+&lt;p&gt;This certainly was a bit of a long ride. It took me &lt;em&gt;much&lt;/em&gt; longer than
+anticipated both to understand all the steps necessary and to write them down.
+I hope you found it helpful and I hope I didn&amp;#39;t make too many, too glaring
+mistakes. If so (either), feel free to let me know on Twitter, reddit or Hacker
+News - but please remember to be kind :)&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote1&quot;&gt;&lt;/a&gt;[1] It is often confusing to people, that the way the
+arrows point in the notation and the order they are written seems to contradict
+each other: When writing \(f:X\to Y\) and \(g:Y\to Z\) you might reasonably
+expect their composite to work like \(f\circ g: X\to Z\), that is, you glue
+together the arrows in the order you are writing them.&lt;/p&gt;
+
+&lt;p&gt;The fact that we are not doing that is a completely justified criticism,
+that is due to a historical accident - we write function application from
+right to left, that is we write \(f(x)\), for applying \(f\) to \(x\).
+Accordingly, we write \(g(f(x))\), when applying \(g\) to the result of
+applying \(f\) to \(x\). And we chose to have the composite-notation be
+consistent with &lt;em&gt;that&lt;/em&gt;, instead of the arrow-notation.&lt;/p&gt;
+
+&lt;p&gt;I chose to just eat the unfortunate confusion, as it turns out Haskell is
+doing exactly the same thing, so swapping things around would just increase
+the confusion.&lt;/p&gt;
+
+&lt;p&gt;Sorry. &lt;a href=&quot;#footnote1_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote2&quot;&gt;&lt;/a&gt;[2] Keep in mind that this is a different notion from the
+ones for Monoids, which we come to a bit later: While the formulas seem the
+same and the identities look like a unit, the difference is that only certain
+arrows can be composed, not all. And that there are many identity arrows, not
+just one. However, if we would have only &lt;em&gt;one&lt;/em&gt; object, it would have to be the
+domain and codomain of every arrow and there would be exactly one identity
+arrow. In that case, the notions &lt;em&gt;would&lt;/em&gt; be the same and indeed, &amp;quot;a category
+with exactly one object&amp;quot; is yet another way to define Monoids.
+&lt;a href=&quot;#footnote2_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote3&quot;&gt;&lt;/a&gt;[3] It is customary, to use the same name for the object
+and arrow map, even though that may seem confusing. A slight justification of
+that would be, that the object map is already given by the arrow map anyway: If
+\(F\) is the arrow map, we can define the object map as \(X\mapsto dom(F(\mathrm{id}_X))\).
+So, given that they are always occurring together and you can make one from the
+other, we tend to just drop the distinction and save some symbols.&lt;/p&gt;
+
+&lt;p&gt;What was that? Oh, you thought Mathematicians where precise? Ha!
+&lt;a href=&quot;#footnote3_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote4&quot;&gt;&lt;/a&gt;[4] It is important to note, that this is not really a
+&lt;em&gt;function&lt;/em&gt;. Functions operate on values of a given type. But here, we are
+operating on &lt;em&gt;types&lt;/em&gt; and Haskell has no concept of a &amp;quot;type of types&amp;quot; built in
+that a function could operate on. There are constructs operating on types to
+construct new types, like &lt;code&gt;data&lt;/code&gt;, &lt;code&gt;type&lt;/code&gt;, &lt;code&gt;newtype&lt;/code&gt; or even &lt;code&gt;deriving&lt;/code&gt;. But
+they are special syntactical constructs that exist outside of the realm of
+functions.&lt;/p&gt;
+
+&lt;p&gt;This is one of the things that was tripping me up for a while: I was trying to
+figure out, how I would map types to other types in Haskell or even talk about
+the object map. But the most useful answer is &amp;quot;you don&amp;#39;t&amp;quot;. &lt;a href=&quot;#footnote4_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote5&quot;&gt;&lt;/a&gt;[5] An important note here, is that the \(\eta_X\) are
+&lt;em&gt;arrows&lt;/em&gt;. Where the object map of a functor is just a general association which
+could look anything we like, the components of a natural transformation need to
+preserve the internal structure of the category we are working in.
+&lt;a href=&quot;#footnote5_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote6&quot;&gt;&lt;/a&gt;[6] You will often see these conditions written
+differently, namely written e.g. \(\mu M\) instead of \(\mu\iota\). You can
+treat that as a notational shorthand, it really means the same thing.
+&lt;a href=&quot;#footnote6_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a id=&quot;footnote7&quot;&gt;&lt;/a&gt;[7] There is a technicality here, that Haskell also has
+an intermediate between functor and monad called &amp;quot;applicative&amp;quot;. As I understand
+it, this does not have a clear category theoretical analogue. I&amp;#39;m not sure why
+it exits, but I believe it has been added into the hierarchy after the fact.
+&lt;a href=&quot;#footnote7_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
+</content>
+  </entry>
   
   <entry>
     <id>https://blog.merovius.de//2018/01/02/my-case-for-veganism</id>
