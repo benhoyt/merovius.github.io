@@ -69,7 +69,7 @@ Haskellers category theory, mathematicians Haskell and people who know neither
 both. Unsurprisingly, this is not what this is, at all. It ended up mostly a
 write up to assure myself that I understood the path myself. If anything, you
 can treat this as a kind of "reading companion": If you want to understand this
-topic of the intersection between category theory and Functional Programming,
+topic of the intersection between category theory and functional programming,
 this post can lead you through the correct terms to search for and give you a
 good idea what to focus on, in the respective Wikipedia articles.
 
@@ -590,21 +590,22 @@ the confusion.
 Sorry. [⬆](#footnote1_back)
 
 <a id="footnote2"></a>[2] Keep in mind that this is a different notion from the
-ones for Monoids, which we come to a bit later: While the formulas seem the
+ones for monoids, which we come to a bit later: While the formulas seem the
 same and the identities look like a unit, the difference is that only certain
 arrows can be composed, not all. And that there are many identity arrows, not
 just one. However, if we would have only *one* object, it would have to be the
 domain and codomain of every arrow and there would be exactly one identity
 arrow. In that case, the notions *would* be the same and indeed, "a category
-with exactly one object" is yet another way to define Monoids.
+with exactly one object" is yet another way to define monoids.
 [⬆](#footnote2_back)
 
 <a id="footnote3"></a>[3] It is customary, to use the same name for the object
 and arrow map, even though that may seem confusing. A slight justification of
 that would be, that the object map is already given by the arrow map anyway: If
-\\(F\\) is the arrow map, we can define the object map as \\(X\mapsto dom(F(\mathrm{id}\_X))\\).
-So, given that they are always occurring together and you can make one from the
-other, we tend to just drop the distinction and save some symbols.
+\\(F\\) is the arrow map, we can define the object map as \\(X\mapsto
+\mathrm{dom}(F(\mathrm{id}\_X))\\). So, given that they are always occurring
+together and you can make one from the other, we tend to just drop the
+distinction and save some symbols.
 
 What was that? Oh, you thought Mathematicians where precise? Ha!
 [⬆](#footnote3_back)

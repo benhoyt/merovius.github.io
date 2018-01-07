@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-01-07T23:43:18+00:00</updated>
+  <updated>2018-01-07T23:54:55+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -73,7 +73,7 @@ Haskellers category theory, mathematicians Haskell and people who know neither
 both. Unsurprisingly, this is not what this is, at all. It ended up mostly a
 write up to assure myself that I understood the path myself. If anything, you
 can treat this as a kind of &amp;quot;reading companion&amp;quot;: If you want to understand this
-topic of the intersection between category theory and Functional Programming,
+topic of the intersection between category theory and functional programming,
 this post can lead you through the correct terms to search for and give you a
 good idea what to focus on, in the respective Wikipedia articles.&lt;/p&gt;
 
@@ -600,21 +600,22 @@ the confusion.&lt;/p&gt;
 &lt;p&gt;Sorry. &lt;a href=&quot;#footnote1_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
 
 &lt;p&gt;&lt;a id=&quot;footnote2&quot;&gt;&lt;/a&gt;[2] Keep in mind that this is a different notion from the
-ones for Monoids, which we come to a bit later: While the formulas seem the
+ones for monoids, which we come to a bit later: While the formulas seem the
 same and the identities look like a unit, the difference is that only certain
 arrows can be composed, not all. And that there are many identity arrows, not
 just one. However, if we would have only &lt;em&gt;one&lt;/em&gt; object, it would have to be the
 domain and codomain of every arrow and there would be exactly one identity
 arrow. In that case, the notions &lt;em&gt;would&lt;/em&gt; be the same and indeed, &amp;quot;a category
-with exactly one object&amp;quot; is yet another way to define Monoids.
+with exactly one object&amp;quot; is yet another way to define monoids.
 &lt;a href=&quot;#footnote2_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
 
 &lt;p&gt;&lt;a id=&quot;footnote3&quot;&gt;&lt;/a&gt;[3] It is customary, to use the same name for the object
 and arrow map, even though that may seem confusing. A slight justification of
 that would be, that the object map is already given by the arrow map anyway: If
-\(F\) is the arrow map, we can define the object map as \(X\mapsto dom(F(\mathrm{id}_X))\).
-So, given that they are always occurring together and you can make one from the
-other, we tend to just drop the distinction and save some symbols.&lt;/p&gt;
+\(F\) is the arrow map, we can define the object map as \(X\mapsto
+\mathrm{dom}(F(\mathrm{id}_X))\). So, given that they are always occurring
+together and you can make one from the other, we tend to just drop the
+distinction and save some symbols.&lt;/p&gt;
 
 &lt;p&gt;What was that? Oh, you thought Mathematicians where precise? Ha!
 &lt;a href=&quot;#footnote3_back&quot;&gt;⬆&lt;/a&gt;&lt;/p&gt;
