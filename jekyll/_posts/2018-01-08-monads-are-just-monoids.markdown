@@ -6,6 +6,8 @@ tags: ["haskell", "math", "programming"]
 date: 2018-01-08 00:30:00
 ---
 
+**tl;dr: I explain the mathematical background of a joke-explanation of monads. Contains lots of math and a hasty introduction to category theory.**
+
 There is a running gag in the programming community, that newcomers will often
 be confused by the concept of monads (which are sequential computations are
 modeled in purely functional languages) and getting the explanation "it is
