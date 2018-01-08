@@ -14,7 +14,7 @@
 			"content_html": "<p><strong>tl;dr: I explain the mathematical background of a joke-explanation of monads. Contains lots of math and a hasty introduction to category theory.</strong></p>
 
 <p>There is a running gag in the programming community, that newcomers will often
-be confused by the concept of monads (which are sequential computations are
+be confused by the concept of monads (which is how sequential computations are
 modeled in purely functional languages) and getting the explanation &quot;it is
 simple, really: Monads are just monoids in the category of endofunctors&quot;. This
 is not meant as an actual explanation, but rather to poke a bit of fun at the
@@ -95,7 +95,7 @@ be a composed arrow<a href="#footnote1">¹</a><a id="footnote1_back"></a>
 \(g\).</p>
 
 <p>Furthermore, the identity arrows must act as a <em>unit</em> for composition, that is,
-they arrow \(f\) we require \(\mathrm{id}\circ f = f = f
+for every arrow \(f\) we require \(\mathrm{id}\circ f = f = f
 \circ\mathrm{id}\). We also require composition to be <em>associative</em>, that is
 \((f\circ g)\circ h = f\circ(g\circ h)\) (whenever all compositions exist)<a href="#footnote2">²</a><a id="footnote2_back"></a>.</p>
 

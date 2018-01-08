@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-01-08T00:30:19+00:00</updated>
+  <updated>2018-01-08T19:44:14+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -19,7 +19,7 @@
     <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: I explain the mathematical background of a joke-explanation of monads. Contains lots of math and a hasty introduction to category theory.&lt;/strong&gt;&lt;/p&gt;
 
 &lt;p&gt;There is a running gag in the programming community, that newcomers will often
-be confused by the concept of monads (which are sequential computations are
+be confused by the concept of monads (which is how sequential computations are
 modeled in purely functional languages) and getting the explanation &amp;quot;it is
 simple, really: Monads are just monoids in the category of endofunctors&amp;quot;. This
 is not meant as an actual explanation, but rather to poke a bit of fun at the
@@ -100,7 +100,7 @@ be a composed arrow&lt;a href=&quot;#footnote1&quot;&gt;¹&lt;/a&gt;&lt;a id=&qu
 \(g\).&lt;/p&gt;
 
 &lt;p&gt;Furthermore, the identity arrows must act as a &lt;em&gt;unit&lt;/em&gt; for composition, that is,
-they arrow \(f\) we require \(\mathrm{id}\circ f = f = f
+for every arrow \(f\) we require \(\mathrm{id}\circ f = f = f
 \circ\mathrm{id}\). We also require composition to be &lt;em&gt;associative&lt;/em&gt;, that is
 \((f\circ g)\circ h = f\circ(g\circ h)\) (whenever all compositions exist)&lt;a href=&quot;#footnote2&quot;&gt;²&lt;/a&gt;&lt;a id=&quot;footnote2_back&quot;&gt;&lt;/a&gt;.&lt;/p&gt;
 
