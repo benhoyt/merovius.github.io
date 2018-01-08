@@ -565,8 +565,11 @@ join v = v >>= id
 This certainly was a bit of a long ride. It took me *much* longer than
 anticipated both to understand all the steps necessary and to write them down.
 I hope you found it helpful and I hope I didn't make too many, too glaring
-mistakes. If so (either), feel free to let me know on Twitter, reddit or Hacker
-News - but please remember to be kind :)
+mistakes. If so (either), feel free to let me know on
+[Twitter](https://twitter.com/TheMerovius),
+[reddit](https://www.reddit.com/r/haskell/comments/7oudxd/monads_are_just_monoids_in_the_category_of/)
+or [Hacker News](https://news.ycombinator.com/item?id=16093508) - but please
+remember to be kind :)
 
 ---
 

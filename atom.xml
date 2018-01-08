@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-01-07T23:54:55+00:00</updated>
+  <updated>2018-01-08T00:24:33+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -575,8 +575,11 @@ for in functional programming. But we can move between &lt;code&gt;join&lt;/code
 &lt;p&gt;This certainly was a bit of a long ride. It took me &lt;em&gt;much&lt;/em&gt; longer than
 anticipated both to understand all the steps necessary and to write them down.
 I hope you found it helpful and I hope I didn&amp;#39;t make too many, too glaring
-mistakes. If so (either), feel free to let me know on Twitter, reddit or Hacker
-News - but please remember to be kind :)&lt;/p&gt;
+mistakes. If so (either), feel free to let me know on
+&lt;a href=&quot;https://twitter.com/TheMerovius&quot;&gt;Twitter&lt;/a&gt;,
+&lt;a href=&quot;https://www.reddit.com/r/haskell/comments/7oudxd/monads_are_just_monoids_in_the_category_of/&quot;&gt;reddit&lt;/a&gt;
+or &lt;a href=&quot;https://news.ycombinator.com/item?id=16093508&quot;&gt;Hacker News&lt;/a&gt; - but please
+remember to be kind :)&lt;/p&gt;
 
 &lt;hr&gt;
 

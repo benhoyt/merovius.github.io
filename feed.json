@@ -570,8 +570,11 @@ for in functional programming. But we can move between <code>join</code> and <co
 <p>This certainly was a bit of a long ride. It took me <em>much</em> longer than
 anticipated both to understand all the steps necessary and to write them down.
 I hope you found it helpful and I hope I didn&#39;t make too many, too glaring
-mistakes. If so (either), feel free to let me know on Twitter, reddit or Hacker
-News - but please remember to be kind :)</p>
+mistakes. If so (either), feel free to let me know on
+<a href="https://twitter.com/TheMerovius">Twitter</a>,
+<a href="https://www.reddit.com/r/haskell/comments/7oudxd/monads_are_just_monoids_in_the_category_of/">reddit</a>
+or <a href="https://news.ycombinator.com/item?id=16093508">Hacker News</a> - but please
+remember to be kind :)</p>
 
 <hr>
 
