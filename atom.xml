@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-01-08T19:44:14+00:00</updated>
+  <updated>2018-01-09T07:59:25+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -94,7 +94,7 @@ may be none.&lt;/p&gt;
 \(\mathrm{id}:X\to X\) attached to every object \(X\), which has \(X\) as
 both domain and codomain. Secondly, we require (some) arrows to be
 &lt;em&gt;composable&lt;/em&gt;. That is if we have two arrows \(f:X\to Y,g:Y\to Z\) - so,
-whenever the codomain of \(g\) is the domain of \(f\) - there should also
+whenever the domain of \(g\) is the codomain of \(f\) - there should also
 be a composed arrow&lt;a href=&quot;#footnote1&quot;&gt;¹&lt;/a&gt;&lt;a id=&quot;footnote1_back&quot;&gt;&lt;/a&gt;
 \(g\circ f: X\to Z\), that shares the domain with \(f\) and the codomain with
 \(g\).&lt;/p&gt;

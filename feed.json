@@ -89,7 +89,7 @@ may be none.</p>
 \(\mathrm{id}:X\to X\) attached to every object \(X\), which has \(X\) as
 both domain and codomain. Secondly, we require (some) arrows to be
 <em>composable</em>. That is if we have two arrows \(f:X\to Y,g:Y\to Z\) - so,
-whenever the codomain of \(g\) is the domain of \(f\) - there should also
+whenever the domain of \(g\) is the codomain of \(f\) - there should also
 be a composed arrow<a href="#footnote1">¹</a><a id="footnote1_back"></a>
 \(g\circ f: X\to Z\), that shares the domain with \(f\) and the codomain with
 \(g\).</p>

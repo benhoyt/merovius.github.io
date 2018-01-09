@@ -90,7 +90,7 @@ We do need *some* restrictions: First, we require a specific *identity* arrow
 \\(\mathrm{id}:X\to X\\) attached to every object \\(X\\), which has \\(X\\) as
 both domain and codomain. Secondly, we require (some) arrows to be
 *composable*. That is if we have two arrows \\(f:X\to Y,g:Y\to Z\\) - so,
-whenever the codomain of \\(g\\) is the domain of \\(f\\) - there should also
+whenever the domain of \\(g\\) is the codomain of \\(f\\) - there should also
 be a composed arrow[¹](#footnote1)<a id="footnote1_back"></a>
 \\(g\circ f: X\to Z\\), that shares the domain with \\(f\\) and the codomain with
 \\(g\\).
