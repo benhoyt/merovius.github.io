@@ -8,6 +8,241 @@
 	},
 	"items": [
 		{
+			"id": "https://blog.merovius.de//2018/01/15/generating_entropy_without_imports_in_go",
+			"url": "https://blog.merovius.de//2018/01/15/generating_entropy_without_imports_in_go.html",
+			"title": "Generating entropy without imports in Go",
+			"content_html": "<p><strong>tl;dr: I come up with a couple of useless, but entertaining ways to generate entropy without relying on any packages.</strong></p>
+
+<p>This post is inspired by a <a href="https://www.reddit.com/r/golang/comments/7qb74r/can_golang_package_source_with_no_imports_be/dso7xsc/">comment on reddit</a>,
+saying</p>
+
+<blockquote>
+<p>[…]given the constraints of no imports and the function signature:</p>
+
+<p><code>func F(map[string]string) map[string]string { ... }</code></p>
+
+<p>F must use a deterministic algorithm, since it is a deterministic algorithm
+it can be represented in a finite state machine.</p>
+</blockquote>
+
+<p>Now, the point of this comment was to talk about how to then compile such a
+function into a deterministic finite state machine, but it got me thinking
+about a somewhat different question. If we disallow any imports and assume a
+standard (gc) Go implementation - how many ways can we find to create a
+non-deterministic function?</p>
+
+<p>So, the challenge I set to myself was: Write a function <code>func() string</code> that a)
+can not refer to any qualified identifier (i.e. no imports) and b) is
+non-deterministic, that is, produces different outputs on each run. To start me
+off, I did add a couple of helpers, to accumulate entropy, generate random
+numbers from it and to format strings as hex, without any imports:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">rand</span> <span class="kt">uint32</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">rand</span><span class="p">)</span> <span class="nx">mix</span><span class="p">(</span><span class="nx">v</span> <span class="kt">uint32</span><span class="p">)</span> <span class="p">{</span>
+    <span class="o">*</span><span class="nx">r</span> <span class="p">=</span> <span class="p">((</span><span class="o">*</span><span class="nx">r</span> <span class="o">&lt;&lt;</span> <span class="mi">5</span><span class="p">)</span> <span class="o">+</span> <span class="o">*</span><span class="nx">r</span><span class="p">)</span> <span class="o">+</span> <span class="nx">rand</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">rand</span><span class="p">)</span> <span class="nx">rand</span><span class="p">()</span> <span class="kt">uint32</span> <span class="p">{</span>
+    <span class="nx">mx</span> <span class="o">:=</span> <span class="nx">rand</span><span class="p">(</span><span class="nb">int32</span><span class="p">(</span><span class="o">*</span><span class="nx">r</span><span class="p">)</span><span class="o">&gt;&gt;</span><span class="mi">31</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xa8888eef</span>
+    <span class="o">*</span><span class="nx">r</span> <span class="p">=</span> <span class="o">*</span><span class="nx">r</span><span class="o">&lt;&lt;</span><span class="mi">1</span> <span class="p">^</span> <span class="nx">mx</span>
+    <span class="k">return</span> <span class="nb">uint32</span><span class="p">(</span><span class="o">*</span><span class="nx">r</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">hex</span><span class="p">(</span><span class="nx">v</span> <span class="kt">uint32</span><span class="p">)</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">b</span> <span class="p">[]</span><span class="kt">byte</span>
+    <span class="k">for</span> <span class="nx">v</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">x</span> <span class="o">:=</span> <span class="nb">byte</span><span class="p">(</span><span class="nx">v</span> <span class="o">&amp;</span> <span class="mh">0xf</span><span class="p">);</span> <span class="nx">x</span> <span class="p">&lt;</span> <span class="mi">10</span> <span class="p">{</span>
+            <span class="nx">b</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="sc">&#39;0&#39;</span><span class="o">+</span><span class="nx">x</span><span class="p">)</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="nx">b</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">b</span><span class="p">,</span> <span class="sc">&#39;a&#39;</span><span class="o">+</span><span class="nx">x</span><span class="o">-</span><span class="mi">10</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="nx">v</span> <span class="o">&gt;&gt;=</span> <span class="mi">4</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nb">string</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Obviously, these could be inlined, but separating them allows us to reuse them
+for our different functions. Then I set about the actual task at hand.</p>
+
+<h5 id="method-1-map-iteration">Method 1: Map iteration</h5>
+
+<p>In Go, the iteration order of maps is <a href="https://golang.org/ref/spec#For_range">not specified</a>:</p>
+
+<blockquote>
+<p>The iteration order over maps is not specified and is not guaranteed to be
+the same from one iteration to the next.</p>
+</blockquote>
+
+<p>But <code>gc</code>, the canonical Go implementation, actively
+<a href="https://golang.org/doc/go1.3#map">randomizes</a> the map iteration order to
+prevent programs from depending on it. We can use this, to receive some of
+entropy from the runtime, by creating a map and iterating over it:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">MapIteration</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="nx">r</span> <span class="nx">rand</span>
+
+  <span class="nx">m</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kt">uint32</span><span class="p">]</span><span class="kt">bool</span><span class="p">)</span>
+  <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="nb">uint32</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">100</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+    <span class="nx">m</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="p">=</span> <span class="kc">true</span>
+  <span class="p">}</span>
+  <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">1000</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+    <span class="k">for</span> <span class="nx">k</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">m</span> <span class="p">{</span>
+      <span class="nx">r</span><span class="p">.</span><span class="nx">mix</span><span class="p">(</span><span class="nx">k</span><span class="p">)</span>
+      <span class="k">break</span> <span class="c1">// the rest of the loop is deterministic</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="nx">hex</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">rand</span><span class="p">())</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>We first create a map with a bunch of keys. We then iterate over it a bunch of
+times; each map iteration gives us a different start index, which we mix into
+our entropy pool.</p>
+
+<h5 id="method-2-select">Method 2: Select</h5>
+
+<p>Go actually defines <a href="https://golang.org/ref/spec#Select_statements">a way</a> in
+which the runtime is giving us access to entropy directly:</p>
+
+<blockquote>
+<p>If one or more of the communications can proceed, a single one that can
+proceed is chosen via a uniform pseudo-random selection.</p>
+</blockquote>
+
+<p>So the spec guarantees that if we have multiple possible communications in a
+select, the case <em>has</em> to be chosen non-deterministically. We can, again,
+extract that non-determinism:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Select</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">r</span> <span class="nx">rand</span>
+
+    <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">)</span>
+    <span class="nb">close</span><span class="p">(</span><span class="nx">ch</span><span class="p">)</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">1000</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+        <span class="k">select</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="o">&lt;-</span><span class="nx">ch</span><span class="p">:</span>
+            <span class="nx">r</span><span class="p">.</span><span class="nx">mix</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">case</span> <span class="o">&lt;-</span><span class="nx">ch</span><span class="p">:</span>
+            <span class="nx">r</span><span class="p">.</span><span class="nx">mix</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nx">hex</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">rand</span><span class="p">())</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>We create a channel and immediately close it. We then create a select-statement
+with two cases and depending on which was taken, we mix a different value into
+our entropy pool. The channel is closed, to guarantee that communication can
+always proceed. This way, we extract one bit of entropy per iteration.</p>
+
+<p>Note, that there is no racing or concurrency involved here: This is simple,
+single-threaded Go code. The randomness comes directly from the runtime. Thus,
+this should work in any compliant Go implementation. The <a href="https://play.golang.org/">playground</a>,
+however, is not compliant with the spec in this regard, strictly speaking. It
+is deliberately deterministic.</p>
+
+<h5 id="method-3-race-condition">Method 3: Race condition</h5>
+
+<p>This method exploits the fact, that on a multi-core machine at least, the Go
+scheduler is non-deterministic. So, if we let two goroutines race to write a
+value to a channel, we can extract some entropy from which one wins this race:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">RaceCondition</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">r</span> <span class="nx">rand</span>
+
+    <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">1000</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+        <span class="nx">ch</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">uint32</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="nx">start</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">)</span>
+        <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+            <span class="o">&lt;-</span><span class="nx">start</span>
+            <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="mi">1</span>
+        <span class="p">}()</span>
+        <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+            <span class="o">&lt;-</span><span class="nx">start</span>
+            <span class="nx">ch</span> <span class="o">&lt;-</span> <span class="mi">2</span>
+        <span class="p">}()</span>
+        <span class="nb">close</span><span class="p">(</span><span class="nx">start</span><span class="p">)</span>
+        <span class="nx">r</span><span class="p">.</span><span class="nx">mix</span><span class="p">(</span><span class="o">&lt;-</span><span class="nx">ch</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="nx">hex</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">rand</span><span class="p">())</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The <code>start</code> channel is there to make sure that both goroutines become runnable
+concurrently. Otherwise, the first goroutine would be relatively likely to
+write the value before the second is even spawned.</p>
+
+<h5 id="method-4-allocation-data-races">Method 4: Allocation/data races</h5>
+
+<p>Another thought I had, was to try to extract some entropy from the allocator or
+GC. The basic idea is, that the address of an allocated value might be
+non-deterministic - in particular, if we allocate a lot. We can then try use
+that as entropy.</p>
+
+<p>However, I could not make this work very well, for the simple reason that Go
+does not allow you to actually do anything with pointers - except dereferencing
+and comparing them for equality. So while you might get non-deterministic
+values, those values can&#39;t be used to actually generate random numbers.</p>
+
+<p>I thought I might be able to somehow get a string or integer representation of
+some pointer without any imports. One way I considered was inducing a
+runtime-panic and recovering that, in the hope that the error string would
+contain a stacktrace or offending values. However, none of the error strings
+created by the runtime actually seem to contain any values that could be used
+here.</p>
+
+<p>I also tried a workaround to interpret the pointer as an integer, by exploiting
+<a href="https://research.swtch.com/gorace">race conditions</a> to do unsafe operations:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">DataRace</span><span class="p">()</span> <span class="kt">string</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">r</span> <span class="nx">rand</span>
+
+    <span class="kd">var</span> <span class="nx">data</span> <span class="o">*</span><span class="kt">uintptr</span>
+    <span class="kd">var</span> <span class="nx">addr</span> <span class="o">*</span><span class="kt">uintptr</span>
+
+    <span class="kd">var</span> <span class="nx">i</span><span class="p">,</span> <span class="nx">j</span><span class="p">,</span> <span class="nx">k</span> <span class="kd">interface</span><span class="p">{}</span>
+    <span class="nx">i</span> <span class="p">=</span> <span class="p">(</span><span class="o">*</span><span class="kt">uintptr</span><span class="p">)(</span><span class="kc">nil</span><span class="p">)</span>
+    <span class="nx">j</span> <span class="p">=</span> <span class="o">&amp;</span><span class="nx">data</span>
+
+    <span class="nx">done</span> <span class="o">:=</span> <span class="kc">false</span>
+    <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">for</span> <span class="p">!</span><span class="nx">done</span> <span class="p">{</span>
+            <span class="nx">k</span> <span class="p">=</span> <span class="nx">i</span>
+            <span class="nx">k</span> <span class="p">=</span> <span class="nx">j</span>
+        <span class="p">}</span>
+    <span class="p">}()</span>
+    <span class="k">for</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="nx">p</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">k</span><span class="p">.(</span><span class="o">*</span><span class="kt">uintptr</span><span class="p">);</span> <span class="nx">ok</span> <span class="o">&amp;&amp;</span> <span class="nx">p</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="nx">addr</span> <span class="p">=</span> <span class="nx">p</span>
+            <span class="nx">done</span> <span class="p">=</span> <span class="kc">true</span>
+            <span class="k">break</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="nx">data</span> <span class="p">=</span> <span class="nb">new</span><span class="p">(</span><span class="kt">uintptr</span><span class="p">)</span>
+    <span class="nx">r</span><span class="p">.</span><span class="nx">mix</span><span class="p">(</span><span class="nb">uint32</span><span class="p">(</span><span class="o">*</span><span class="nx">addr</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nx">hex</span><span class="p">(</span><span class="nx">r</span><span class="p">.</span><span class="nx">rand</span><span class="p">())</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>It turns out, however, that at least this particular instance of a data race
+has been fixed since Russ Cox wrote that blog post. In Go 1.9, this code just
+loops endlessly. I tried it in Go 1.5, though, and it works there - but we
+don&#39;t get a whole lot of entropy (addresses are not <em>that</em> random). With other
+methods, we could re-run the code to collect more entropy, but in this case,
+I believe the escape analysis gets into our way by stack-allocating the
+pointer, so it will be the same one on each run.</p>
+
+<p>I like this method, because it uses several obscure steps to work, but on the
+other hand, it&#39;s the least reliable and it requires an old Go version.</p>
+
+<h5 id="your-methods">Your Methods?</h5>
+
+<p>These are all the methods I could think of; but I&#39;m sure I missed a couple. If
+you can think of any, feel free to let me know on
+<a href="https://twitter.com/TheMerovius">Twitter</a>, reddit or hackernews :) I also
+posted the code in a
+<a href="https://gist.github.com/Merovius/283ff12a1186d001815485fca1094968">gist</a>, so
+you can download and run it yourself, but keep in mind, that the last method
+busy-loops in newer Go versions.</p>
+",
+			"summary": "I come up with a couple of useless, but entertaining ways to generate entropy without relying on any packages.",
+			"date_published": "2018-01-15T01:04:30+00:00"
+		},
+		{
 			"id": "https://blog.merovius.de//2018/01/08/monads-are-just-monoids",
 			"url": "https://blog.merovius.de//2018/01/08/monads-are-just-monoids.html",
 			"title": "Monads are just monoids in the category of endofunctors",
