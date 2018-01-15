@@ -238,8 +238,10 @@ other hand, it's the least reliable and it requires an old Go version.
 
 These are all the methods I could think of; but I'm sure I missed a couple. If
 you can think of any, feel free to let me know on
-[Twitter](https://twitter.com/TheMerovius), reddit or hackernews :) I also
-posted the code in a
+[Twitter](https://twitter.com/TheMerovius),
+[reddit](https://www.reddit.com/r/golang/comments/7qfvzu/generating_entropy_without_imports_in_go/)
+or [hackernews](https://news.ycombinator.com/item?id=16147475) :) I also posted
+the code in a
 [gist](https://gist.github.com/Merovius/283ff12a1186d001815485fca1094968), so
 you can download and run it yourself, but keep in mind, that the last method
 busy-loops in newer Go versions.
