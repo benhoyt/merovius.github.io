@@ -367,6 +367,10 @@ each edit. Given that they all share most of their structure, this is very
 efficient. Implementing ropes is what really bought me into the patterns
 I'm presenting here. Let's see, how we could represent them.
 
+<a href="https://en.wikipedia.org/wiki/Rope_(data_structure)#/media/File:Vector_Rope_example.svg">
+  <img src="/assets/Vector_Rope_example.svg" alt='Rope representing the string "Hello_my_name_is_Simon"'>
+</a>
+
 A Rope is a binary tree with strings as leafs. The represented string
 is what you get when you do a depth-first traversal and concatenate all the
 leafs. Every node in the tree also has a *weight*, which corresponds to the
