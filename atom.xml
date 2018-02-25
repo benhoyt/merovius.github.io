@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-02-25T16:38:15+00:00</updated>
+  <updated>2018-02-25T22:39:02+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -349,6 +349,10 @@ a stack (or ringbuffer) of Ropes, representing the states the file was in after
 each edit. Given that they all share most of their structure, this is very
 efficient. Implementing ropes is what really bought me into the patterns
 I&amp;#39;m presenting here. Let&amp;#39;s see, how we could represent them.&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/Rope_(data_structure)#/media/File:Vector_Rope_example.svg&quot;&gt;
+  &lt;img src=&quot;/assets/Vector_Rope_example.svg&quot; alt=&#39;Rope representing the string &quot;Hello_my_name_is_Simon&quot;&#39;&gt;
+&lt;/a&gt;&lt;/p&gt;
 
 &lt;p&gt;A Rope is a binary tree with strings as leafs. The represented string
 is what you get when you do a depth-first traversal and concatenate all the
