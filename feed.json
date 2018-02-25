@@ -8,6 +8,478 @@
 	},
 	"items": [
 		{
+			"id": "https://blog.merovius.de//2018/02/25/persistent_datastructures_with_go",
+			"url": "https://blog.merovius.de//2018/02/25/persistent_datastructures_with_go.html",
+			"title": "Persistent datastructures with Go",
+			"content_html": "<p>I&#39;ve recently taken a liking to <a href="https://en.wikipedia.org/wiki/Persistent_data_structure">persistent datastructures</a>.
+These are datastructures where instead of mutating data in-place, you are
+creating a new version of the datastructures, that shares most of its state
+with the previous version. Not all datastructures can be implemented
+efficiently like this, but those that do get a couple of immediate benefits -
+keeping old versions around allows you to get cheap snapshotting and copying.
+It is trivial to pass a copy to a different thread and you don&#39;t have to worry
+about concurrent writes, as neither actually mutates any shared state.</p>
+
+<p>Persistent datastructures are popular in functional programming languages, but
+I also found the idea a useful tool to model datastructures in Go. Go&#39;s
+interfaces provide a nice way to model them and make them easy to reason about.
+In this post, I will try to illustrate this with a couple of examples.</p>
+
+<p>There are four key ideas I&#39;d like you to walk away with:</p>
+
+<ul>
+<li>Modeling datastructures as persistent (<em>if possible</em>) makes them easier to
+reason about.</li>
+<li>When you want to use sum types, try to think of the common properties you are
+trying to abstract over instead - put those in an interface.</li>
+<li>Separate out the required from the provided interface. Make the former an
+interface type, provide the latter as functions or a wrapper.</li>
+<li>Doing these allows you to add more efficient implementations later, when you
+discover they are necessary.</li>
+</ul>
+
+<h4 id="linked-lists">Linked lists</h4>
+
+<p>This is more of an illustrative example, to demonstrate the techniques, than
+actually useful. But one of the simplest datastructures existing are linked
+lists: A list of nodes, where each node has a value and possibly a next node
+(unless we are at the end of the List). In functional languages, you&#39;d use a
+sum type to express this:</p>
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span></span><span class="kr">type</span> <span class="kt">List</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Node</span> <span class="n">a</span> <span class="p">(</span><span class="kt">List</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- either it&#39;s a node with a value and the rest of the list</span>
+            <span class="o">|</span> <span class="kt">End</span>             <span class="c1">-- or it&#39;s the end of the list</span>
+</code></pre></div>
+<p>Go infamously does not have sum types, but we can use interfaces to instead.
+The classical way would be something like</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">List</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="c1">// We use an unexported marker-method. As nothing outside the current package</span>
+  <span class="c1">// can implement this unexported method, we get control over all</span>
+  <span class="c1">// implementations of List and can thus de-facto close the set of possible</span>
+  <span class="c1">// types.</span>
+  <span class="nx">list</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">Node</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">Value</span> <span class="kt">int</span>
+  <span class="nx">Next</span> <span class="nx">List</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">Node</span><span class="p">)</span> <span class="nx">list</span><span class="p">()</span> <span class="p">{}</span>
+
+<span class="kd">type</span> <span class="nx">End</span> <span class="kd">struct</span> <span class="p">{}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">End</span><span class="p">)</span> <span class="nx">list</span><span class="p">()</span> <span class="p">{}</span>
+
+<span class="kd">func</span> <span class="nx">Value</span><span class="p">(</span><span class="nx">l</span> <span class="nx">List</span><span class="p">)</span> <span class="p">(</span><span class="nx">v</span> <span class="kt">int</span><span class="p">,</span> <span class="nx">ok</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">switch</span> <span class="nx">l</span> <span class="o">:=</span> <span class="nx">l</span><span class="p">.(</span><span class="kd">type</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">case</span> <span class="nx">Node</span><span class="p">:</span>
+    <span class="k">return</span> <span class="nx">l</span><span class="p">.</span><span class="nx">Value</span><span class="p">,</span> <span class="kc">true</span>
+  <span class="k">case</span> <span class="nx">End</span><span class="p">:</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="kc">false</span>
+  <span class="k">default</span><span class="p">:</span>
+    <span class="c1">// This should never happen. Someone violated our sum-type assumption.</span>
+    <span class="nb">panic</span><span class="p">(</span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;unknown type %T&quot;</span><span class="p">,</span> <span class="nx">l</span><span class="p">))</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This works, but it is not really idiomatic Go code. It is error-prone and easy
+to misuse, leading to potential panics. But there is a different way to model
+this using interfaces, closer to how they are intended. Instead of expressing
+what a list is</p>
+
+<blockquote>
+<p>A list <em>is</em> either a value and a next element, or the end of the list</p>
+</blockquote>
+
+<p>we say what we want a list to be able to <em>do</em>:</p>
+
+<blockquote>
+<p>A list has a current element and may have a tail</p>
+</blockquote>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">List</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="c1">// Value returns the current value of the list</span>
+  <span class="nx">Value</span><span class="p">()</span> <span class="kt">int</span>
+  <span class="c1">// Next returns the tail of the list, or nil, if this is the last node.</span>
+  <span class="nx">Next</span><span class="p">()</span> <span class="nx">List</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">node</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">value</span> <span class="kt">int</span>
+  <span class="nx">next</span>  <span class="nx">List</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">n</span> <span class="nx">node</span><span class="p">)</span> <span class="nx">Value</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">n</span><span class="p">.</span><span class="nx">value</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">n</span> <span class="nx">node</span><span class="p">)</span> <span class="nx">Next</span><span class="p">()</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">n</span><span class="p">.</span><span class="nx">next</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">New</span><span class="p">(</span><span class="nx">v</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">node</span><span class="p">{</span><span class="nx">v</span><span class="p">,</span> <span class="kc">nil</span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Prepend</span><span class="p">(</span><span class="nx">l</span> <span class="nx">List</span><span class="p">,</span> <span class="nx">v</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">node</span><span class="p">{</span><span class="nx">v</span><span class="p">,</span> <span class="nx">l</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This is a far more elegant abstraction. The empty list is represented by the
+<code>nil</code> interface. We have only one implementation of that interface, for the
+nodes. We offer exported functions to create new lists - potentially from
+existing ones.</p>
+
+<p>Note that the methods actually have <code>node</code> as a receiver, not <code>*node</code>, as we
+often tend to do with structs. This fact makes this implementation a
+<em>persistent</em> linked list. None of the methods can modify the list. So after
+creation, the linked list will stay forever immutable. Even if you type-assert
+to get to the underlying data, that would only provide you with a <em>copy</em> of the
+data - the original would stay unmodified. The memory layout, however, is the
+same - the value gets put on the heap and you are only passing pointers to it
+around.</p>
+
+<p>The beauty of this way to think about linked lists, is that it allows us to
+amend it after the fact. For example, say we notice that our program is slow,
+due to excessive cache-misses (as linked lists are not contiguous in memory).
+We can easily add a function, that packs a list:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">packed</span> <span class="p">[]</span><span class="kt">int</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">packed</span><span class="p">)</span> <span class="nx">Value</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">packed</span><span class="p">)</span> <span class="nx">Next</span><span class="p">()</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">p</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="kc">nil</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="nx">p</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Pack</span><span class="p">(</span><span class="nx">l</span> <span class="nx">List</span><span class="p">)</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="nx">l</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="kc">nil</span>
+  <span class="p">}</span>
+  <span class="kd">var</span> <span class="nx">p</span> <span class="nx">packed</span>
+  <span class="k">for</span> <span class="p">;</span> <span class="nx">l</span> <span class="o">!=</span> <span class="kc">nil</span><span class="p">;</span> <span class="nx">l</span> <span class="p">=</span> <span class="nx">l</span><span class="p">.</span><span class="nx">Next</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">p</span> <span class="p">=</span> <span class="nb">append</span><span class="p">(</span><span class="nx">p</span><span class="p">,</span> <span class="nx">l</span><span class="p">.</span><span class="nx">Value</span><span class="p">())</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="nx">p</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The cool thing about this is that we can mix and match the two: For example,
+we could prepend new elements and once the list gets too long, pack it and
+continue to prepend to the packed list. And since <code>List</code> is an interface, users
+can implement it themselves and use it with our existing implementation. So,
+for example, a user could build us a list that calculates fibonacci numbers:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">fib</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="kt">int</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">fib</span><span class="p">)</span> <span class="nx">Value</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">fib</span><span class="p">)</span> <span class="nx">Next</span><span class="p">()</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">fib</span><span class="p">{</span><span class="nx">l</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nx">l</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="nx">l</span><span class="p">[</span><span class="mi">1</span><span class="p">]}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>and then use that with functions that take a <code>List</code>. Or they could have a
+lazily evaluated list:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">lazy</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">o</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Once</span>
+  <span class="nx">f</span> <span class="kd">func</span><span class="p">()</span> <span class="p">(</span><span class="kt">int</span><span class="p">,</span> <span class="nx">List</span><span class="p">)</span>
+  <span class="nx">v</span> <span class="kt">int</span>
+  <span class="nx">next</span> <span class="nx">List</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">lazy</span><span class="p">)</span> <span class="nx">Value</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+  <span class="nx">l</span><span class="p">.</span><span class="nx">o</span><span class="p">.</span><span class="nx">Do</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="nx">l</span><span class="p">.</span><span class="nx">v</span><span class="p">,</span> <span class="nx">l</span><span class="p">.</span><span class="nx">next</span> <span class="p">=</span> <span class="nx">l</span><span class="p">.</span><span class="nx">f</span><span class="p">()</span> <span class="p">})</span>
+  <span class="k">return</span> <span class="nx">l</span><span class="p">.</span><span class="nx">v</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="o">*</span><span class="nx">lazy</span><span class="p">)</span> <span class="nx">Next</span><span class="p">()</span> <span class="nx">List</span> <span class="p">{</span>
+  <span class="nx">l</span><span class="p">.</span><span class="nx">o</span><span class="p">.</span><span class="nx">Do</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span> <span class="nx">l</span><span class="p">.</span><span class="nx">v</span><span class="p">,</span> <span class="nx">l</span><span class="p">.</span><span class="nx">next</span> <span class="p">=</span> <span class="nx">l</span><span class="p">.</span><span class="nx">f</span><span class="p">()</span> <span class="p">})</span>
+  <span class="k">return</span> <span class="nx">l</span><span class="p">.</span><span class="nx">next</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Note that in this case the methods need to be on a pointer-receiver. This
+(technically) leaves the realm of persistent data-structures. While they
+motivated our interface-based abstraction and helped us come up with a safe
+implementation, we are not actually <em>bound</em> to them. If we later decide, that
+for performance reasons we want to add a mutable implementation, we can do so
+(of course, we still have to make sure that we maintain the safety of the
+original). And we can intermix the two, allowing us to only apply this
+optimization to part of our data structure.</p>
+
+<p>I find this a pretty helpful way to think about datastructures.</p>
+
+<h4 id="associative-lists">Associative lists</h4>
+
+<p>Building on linked lists, we can build a map based on <a href="https://en.wikipedia.org/wiki/Association_list">Association Lists</a>.
+It&#39;s a similar idea as before:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Map</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="nx">Value</span><span class="p">(</span><span class="nx">k</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span>
+  <span class="nx">Set</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="nx">Map</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">empty</span> <span class="kd">struct</span><span class="p">{}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">empty</span><span class="p">)</span> <span class="nx">Value</span><span class="p">(</span><span class="nx">_</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">empty</span><span class="p">)</span> <span class="nx">Set</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="nx">Map</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">pair</span><span class="p">{</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span><span class="p">,</span> <span class="nx">empty</span><span class="p">{}}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Make</span><span class="p">()</span> <span class="nx">Map</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">empty</span><span class="p">{}</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">pair</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}</span>
+  <span class="nx">parent</span> <span class="nx">Map</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">pair</span><span class="p">)</span> <span class="nx">Value</span><span class="p">(</span><span class="nx">k</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="nx">k</span> <span class="o">==</span> <span class="nx">p</span><span class="p">.</span><span class="nx">k</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">p</span><span class="p">.</span><span class="nx">v</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="nx">p</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">Value</span><span class="p">(</span><span class="nx">k</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">pair</span><span class="p">)</span> <span class="nx">Set</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="nx">Map</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">pair</span><span class="p">{</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span><span class="p">,</span> <span class="nx">p</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This time, we don&#39;t represent an empty map as <code>nil</code>, but add a separate
+implementation of the interface for an empty map.  That makes the
+implementation of <code>Value</code> cleaner, as it doesn&#39;t have to check the parent map
+for <code>nil</code> -- but it requires users to call <code>Make</code>.</p>
+
+<p>There is a problem with our <code>Map</code>, though: We cannot iterate over it. The
+interface does not give us access to any parent maps. We could use
+type-assertion, but that would preclude users from implementing their own. What
+if we added a method to the interface to support iteration?</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Map</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="nx">Value</span><span class="p">(</span><span class="nx">k</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span>
+
+  <span class="c1">// Iterate calls f with all key-value pairs in the map.</span>
+  <span class="nx">Iterate</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}))</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">empty</span><span class="p">)</span> <span class="nx">Iterate</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}))</span> <span class="p">{</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">pair</span><span class="p">)</span> <span class="nx">Iterate</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}))</span> <span class="p">{</span>
+  <span class="nx">f</span><span class="p">(</span><span class="nx">p</span><span class="p">.</span><span class="nx">k</span><span class="p">,</span> <span class="nx">p</span><span class="p">.</span><span class="nx">v</span><span class="p">)</span>
+  <span class="nx">p</span><span class="p">.</span><span class="nx">parent</span><span class="p">.</span><span class="nx">Iterate</span><span class="p">(</span><span class="nx">f</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Unfortunately, this still doesn&#39;t really work though: If we write multiple
+times to the same key, <code>Iterate</code> as implemented would call <code>f</code> with all
+key-value-pairs. This is likely not what we want.</p>
+
+<p>The heart of the issue here, is the difference between the <em>required</em> interface
+and the <em>provided</em> interface. We can also see that with <code>Set</code>. Both of the
+implementations of that method look essentially the same and neither actually
+depends on the used type. We could instead provide <code>Set</code> as a function:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Set</span><span class="p">(</span><span class="nx">m</span> <span class="nx">Map</span><span class="p">,</span> <span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="nx">Map</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">pair</span><span class="p">{</span><span class="nx">k</span><span class="p">,</span><span class="nx">v</span><span class="p">,</span><span class="nx">m</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The lesson is, that some operations need support from the implementation, while
+other operations can be implemented without it. The provided interface is the
+set of operations we provide to the user, whereas the required interface is the
+set of operations that we rely on. We can split the two and get something like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// Interface is the set of operations required to implement a persistent map.</span>
+<span class="kd">type</span> <span class="nx">Interface</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="nx">Value</span><span class="p">(</span><span class="nx">k</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span>
+  <span class="nx">Iterate</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}))</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">Map</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">Interface</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">m</span> <span class="nx">Map</span><span class="p">)</span> <span class="nx">Iterate</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}))</span> <span class="p">{</span>
+  <span class="nx">seen</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">map</span><span class="p">[</span><span class="kd">interface</span><span class="p">{}]</span><span class="kt">bool</span><span class="p">)</span>
+  <span class="nx">m</span><span class="p">.</span><span class="nx">Interface</span><span class="p">.</span><span class="nx">Iterate</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">!</span><span class="nx">seen</span><span class="p">[</span><span class="nx">k</span><span class="p">]</span> <span class="p">{</span>
+      <span class="nx">f</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span><span class="p">)</span>
+    <span class="p">}</span>
+  <span class="p">})</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">m</span> <span class="nx">Map</span><span class="p">)</span> <span class="nx">Set</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="nx">Map</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">Map</span><span class="p">{</span><span class="nx">pair</span><span class="p">{</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span><span class="p">,</span> <span class="nx">m</span><span class="p">.</span><span class="nx">Interface</span><span class="p">}}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Using this, we could again implement a packed variant of <code>Map</code>:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">packed</span> <span class="kd">map</span><span class="p">[</span><span class="kd">interface</span><span class="p">{}]</span><span class="kd">interface</span><span class="p">{}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">packed</span><span class="p">)</span> <span class="nx">Value</span><span class="p">(</span><span class="nx">k</span> <span class="kd">interface</span><span class="p">{})</span> <span class="kd">interface</span><span class="p">{}</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">p</span><span class="p">[</span><span class="nx">k</span><span class="p">]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">p</span> <span class="nx">packed</span><span class="p">)</span> <span class="nx">Iterate</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="kd">interface</span><span class="p">{}))</span> <span class="p">{</span>
+  <span class="k">for</span> <span class="nx">k</span><span class="p">,</span> <span class="nx">v</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">p</span> <span class="p">{</span>
+    <span class="nx">f</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span> <span class="nx">v</span><span class="p">)</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Pack</span><span class="p">(</span><span class="nx">m</span> <span class="nx">Map</span><span class="p">)</span> <span class="nx">Map</span> <span class="p">{</span>
+  <span class="nx">p</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="nx">packed</span><span class="p">)</span>
+  <span class="nx">m</span><span class="p">.</span><span class="nx">Iterate</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">k</span><span class="p">,</span><span class="nx">v</span> <span class="kd">interface</span><span class="p">{})</span> <span class="p">{</span>
+    <span class="nx">p</span><span class="p">[</span><span class="nx">k</span><span class="p">]</span> <span class="p">=</span> <span class="nx">v</span>
+  <span class="p">})</span>
+  <span class="k">return</span> <span class="nx">m</span>
+<span class="p">}</span>
+</code></pre></div>
+<h4 id="ropes">Ropes</h4>
+
+<p>A <a href="https://en.wikipedia.org/wiki/Rope_(data_structure)">Rope</a> is a data
+structure to store a string in a way that is efficiently editable. They are
+often used in editors, as it is too slow to copy the complete content on every
+insert operation. Editors also benefit from implementing them as persistent data
+structures, as that makes it very easy to implement multi-level undo: Just have
+a stack (or ringbuffer) of Ropes, representing the states the file was in after
+each edit. Given that they all share most of their structure, this is very
+efficient. Implementing ropes is what really bought me into the patterns
+I&#39;m presenting here. Let&#39;s see, how we could represent them.</p>
+
+<p>A Rope is a binary tree with strings as leafs. The represented string
+is what you get when you do a depth-first traversal and concatenate all the
+leafs. Every node in the tree also has a <em>weight</em>, which corresponds to the
+length of the string for leafs and the length of the left subtree for inner
+nodes. This allows easy recursive lookup of the <code>i</code>th character: If <code>i</code> is less
+than the weight of a node, we look into the left subtree, otherwise into the
+right. Let&#39;s represent this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Base</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="nx">Index</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">byte</span>
+  <span class="nx">Length</span><span class="p">()</span> <span class="kt">int</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">leaf</span> <span class="kt">string</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">leaf</span><span class="p">)</span> <span class="nx">Index</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">byte</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">l</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">leaf</span><span class="p">)</span> <span class="nx">Length</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="nx">l</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">node</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="nx">Base</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">n</span> <span class="nx">node</span><span class="p">)</span> <span class="nx">Index</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">byte</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="nx">w</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">Length</span><span class="p">();</span> <span class="nx">i</span> <span class="o">&gt;=</span> <span class="nx">w</span> <span class="p">{</span>
+    <span class="c1">// The string represented by the right child starts at position w,</span>
+    <span class="c1">// so we subtract it when recursing to the right</span>
+    <span class="k">return</span> <span class="nx">n</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">Index</span><span class="p">(</span><span class="nx">i</span><span class="o">-</span><span class="nx">w</span><span class="p">)</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="nx">n</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">Index</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">n</span> <span class="nx">node</span><span class="p">)</span> <span class="nx">Length</span><span class="p">()</span> <span class="kt">int</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">n</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">Length</span><span class="p">()</span> <span class="o">+</span> <span class="nx">n</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">Length</span><span class="p">()</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">Rope</span> <span class="kd">struct</span> <span class="p">{</span>
+  <span class="nx">Base</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">New</span><span class="p">(</span><span class="nx">s</span> <span class="kt">string</span><span class="p">)</span> <span class="nx">Rope</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">Rope</span><span class="p">{</span><span class="nx">leaf</span><span class="p">(</span><span class="nx">s</span><span class="p">)}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="nx">Rope</span><span class="p">)</span> <span class="nx">Append</span><span class="p">(</span><span class="nx">r2</span> <span class="nx">Rope</span><span class="p">)</span> <span class="nx">Rope</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">Rope</span><span class="p">{</span><span class="nx">node</span><span class="p">{</span><span class="nx">r</span><span class="p">.</span><span class="nx">Base</span><span class="p">,</span> <span class="nx">r2</span><span class="p">.</span><span class="nx">Base</span><span class="p">}}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Note, how we did not actually add a <code>Weight</code>-method to our interface: Given
+that it&#39;s only used by the traversal on inner nodes, we can just directly
+calculate it from its definition as the length of the left child tree. In
+practice, we might want to pre-calculate <code>Length</code> on creation, though, as it
+currently is a costly recursive operation.</p>
+
+<p>The next operation we&#39;d have to support, is splitting a Rope at an index. We
+can&#39;t implement that with our current interface though, we need to add it:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">Base</span> <span class="kd">interface</span> <span class="p">{</span>
+  <span class="nx">Index</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="kt">byte</span>
+  <span class="nx">Length</span><span class="p">()</span> <span class="kt">int</span>
+  <span class="nx">Split</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">(</span><span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="nx">Base</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">l</span> <span class="nx">leaf</span><span class="p">)</span> <span class="nx">Split</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">(</span><span class="nx">Base</span><span class="p">,</span> <span class="nx">Base</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="nx">l</span><span class="p">[:</span><span class="nx">i</span><span class="p">],</span> <span class="nx">l</span><span class="p">[</span><span class="nx">i</span><span class="p">:]</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">n</span> <span class="nx">node</span><span class="p">)</span> <span class="nx">Split</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">(</span><span class="nx">Base</span><span class="p">,</span> <span class="nx">Base</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="nx">w</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">Length</span><span class="p">();</span> <span class="nx">i</span> <span class="o">&gt;=</span> <span class="nx">w</span> <span class="p">{</span>
+    <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.</span><span class="nx">right</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">i</span><span class="o">-</span><span class="nx">w</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nx">node</span><span class="p">{</span><span class="nx">n</span><span class="p">.</span><span class="nx">left</span><span class="p">,</span> <span class="nx">left</span><span class="p">},</span> <span class="nx">right</span>
+  <span class="p">}</span>
+  <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="o">:=</span> <span class="nx">n</span><span class="p">.</span><span class="nx">left</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+  <span class="k">return</span> <span class="nx">left</span><span class="p">,</span> <span class="nx">node</span><span class="p">{</span><span class="nx">n</span><span class="p">.</span><span class="nx">right</span><span class="p">,</span> <span class="nx">right</span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="nx">Rope</span><span class="p">)</span> <span class="nx">Split</span><span class="p">(</span><span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="p">(</span><span class="nx">Rope</span><span class="p">,</span> <span class="nx">Rope</span><span class="p">)</span> <span class="p">{</span>
+  <span class="c1">// Note that we return the wrapping struct, as opposed to Base.</span>
+  <span class="c1">// This is so users work with the provided interface, not the required one.</span>
+  <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="o">:=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+  <span class="k">return</span> <span class="nx">Rope</span><span class="p">{</span><span class="nx">left</span><span class="p">},</span> <span class="nx">Rope</span><span class="p">{</span><span class="nx">right</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>I think this code is remarkably readable and easy to understand - and that is
+mostly due to the fact that we are reusing subtrees whenever we can. What&#39;s
+more, given these operations we can implement the remaining three from the
+wikipedia article easily:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="nx">Rope</span><span class="p">)</span> <span class="nx">Insert</span><span class="p">(</span><span class="nx">r2</span> <span class="nx">Rope</span><span class="p">,</span> <span class="nx">i</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">Rope</span> <span class="p">{</span>
+  <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="o">:=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+  <span class="k">return</span> <span class="nx">left</span><span class="p">.</span><span class="nx">Append</span><span class="p">(</span><span class="nx">r2</span><span class="p">).</span><span class="nx">Append</span><span class="p">(</span><span class="nx">right</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="nx">Rope</span><span class="p">)</span> <span class="nx">Delete</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">j</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">Rope</span> <span class="p">{</span>
+  <span class="nx">left</span><span class="p">,</span> <span class="nx">right</span> <span class="o">:=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">j</span><span class="p">)</span>
+  <span class="nx">left</span><span class="p">,</span> <span class="nx">_</span> <span class="p">=</span> <span class="nx">left</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+  <span class="k">return</span> <span class="nx">left</span><span class="p">.</span><span class="nx">Append</span><span class="p">(</span><span class="nx">right</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">r</span> <span class="nx">Rope</span><span class="p">)</span> <span class="nx">Slice</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span> <span class="nx">j</span> <span class="kt">int</span><span class="p">)</span> <span class="nx">Rope</span> <span class="p">{</span>
+  <span class="nx">r</span><span class="p">,</span> <span class="nx">_</span> <span class="p">=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">j</span><span class="p">)</span>
+  <span class="nx">_</span><span class="p">,</span> <span class="nx">r</span> <span class="p">=</span> <span class="nx">r</span><span class="p">.</span><span class="nx">Split</span><span class="p">(</span><span class="nx">i</span><span class="p">)</span>
+  <span class="k">return</span> <span class="nx">r</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This provides us with a fully functioning Rope implementation. It doesn&#39;t
+support everything we&#39;d need to write an editor, but it&#39;s a good start that was
+quick to write. It is also reasonably simple to extend with more functionality.
+For example, you could imagine having an implementation that can rebalance
+itself, when operations start taking too long. Or adding traversal, or
+random-access unicode support that is still backed by compact UTF-8. And I
+found it reasonably simple (though it required some usage of unsafe) to write
+an implementation of <code>Base</code> that used an <code>mmap</code>ed file (thus you&#39;d only need to
+keep the actual edits in RAM, the rest would be read directly from disk with
+the OS managing caching for you).</p>
+
+<h4 id="closing-remarks">Closing remarks</h4>
+
+<p>None of these ideas are revolutionary (especially to functional programmers).
+But I find that considering if a datastructure I need can be implemented as a
+persistent/immutable one helps me to come up with clear abstractions that work
+well. And I also believe that Go&#39;s interfaces provide a good way to express
+these abstractions - because they allow you to start with a simple, immutable
+implementation and then compose it with mutable ones - if and only if there are
+clear efficiency benefits. Lastly, I think there is an interesting idea here of
+how to substitute sum-types by interfaces - not in a direct manner, but instead
+by thinking about the common behavior you want to provide over the sum.</p>
+
+<p>I hope you find that this inspires you to think differently about these problems too.</p>
+",
+			"summary": "I present a couple of patterns that help modelling persistent datastructures in Go. I also apply them to three examples.",
+			"date_published": "2018-02-25T17:30:00+00:00"
+		},
+		{
 			"id": "https://blog.merovius.de//2018/01/21/what_even_is_error_handling",
 			"url": "https://blog.merovius.de//2018/01/21/what_even_is_error_handling.html",
 			"title": "What even is error handling?",
