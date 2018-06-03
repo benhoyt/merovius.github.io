@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Why doesn't Go have variance in its type system?</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
+
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Between a rock and a crazy place">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="Between a rock and a crazy place">
+    <link rel="alternate" type="application/json" href="/feed.json" title="Between a rock and a crazy place" >
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML'></script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
+
+    <main class="container">
+      <h3>Why doesn't Go have variance in its type system?</h3>
+<p>2018-06-03</p>
+
+<article>
+<p><strong>tl;dr: I explain what co-, contra- and invariance are and what the
+implications for Go&#39;s type system would be. In particular, why it&#39;s impossible
+to have variance in slices.</strong></p>
+
+<p>A question that comes up relatively often with Go newcomers is &quot;why can&#39;t I
+pass e.g. an <code>[]int</code> to a <code>func([]interface{})</code>&quot;? In this post I want to
+explore this question and its implications for Go. But the concept of
+variance (which this is about) is also useful in other languages.</p>
+
+<p>Variance describes what happens to subtype relationships, when they are
+used in composite types. In this context, &quot;A is a subtype of B&quot; means
+that a value of type A can always be used, where a value of type B is required.
+Go doesn&#39;t have explicit subtype relationships - the closest it has is
+<a href="https://golang.org/ref/spec#Assignability">assignability</a> which mostly
+determines whether types can be used interchangeably. Probably the most
+important case of this is given by interfaces: If a type T (whether its a
+concrete type, or itself an interface) implements an interface I, then T can be
+viewed as a subtype of I. In that sense,
+<a href="https://godoc.org/bytes#Buffer"><code>*bytes.Buffer</code></a> is a subtype of
+<a href="https://godoc.org/io#ReadWriter">io.ReadWriter</a>, which is a subtype of
+<a href="https://godoc.org/io#Reader">io.Reader</a>. And every type is a subtype of
+<code>interface{}</code>.</p>
+
+<p>The easiest way to understand what variance means, is to look at function
+types. Let&#39;s assume, we have a type and a subtype - for example, let&#39;s look at
+<code>*bytes.Buffer</code> as a subtype of <code>io.Reader</code>. Say, we have a <code>func()
+*bytes.Buffer</code>. We could also use this like a <code>func() io.Reader</code> - we just
+reinterpret the return value as an <code>io.Reader</code>. The reverse is not true: We
+can&#39;t treat a <code>func() io.Reader</code> as a <code>func() *bytes.Buffer</code>, because not every
+<code>io.Reader</code> is a <code>*bytes.Buffer</code>. So, function return values could <em>preserve</em>
+the direction of subtyping relationships: If A is a subtype of B, <code>func() A</code>
+could be a subtype of <code>func() B</code>. This is called <em>covariance</em>.</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">F</span><span class="p">()</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">G</span><span class="p">()</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Use</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">()</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">useReader</span><span class="p">(</span><span class="nx">f</span><span class="p">())</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">Use</span><span class="p">(</span><span class="nx">F</span><span class="p">)</span> <span class="c1">// Works</span>
+
+    <span class="nx">Use</span><span class="p">(</span><span class="nx">G</span><span class="p">)</span> <span class="c1">// Doesn&#39;t work right now; but *could* be made equivalent to…</span>
+    <span class="nx">Use</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">G</span><span class="p">()</span> <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>On the other hand, say we have a <code>func(*bytes.Buffer)</code>. Now we can&#39;t use that
+as a <code>func(io.Reader)</code>: You can&#39;t call it with an <code>io.Reader</code>. But we <em>can</em> do
+the reverse. If we have a <code>*bytes.Buffer</code>, we can call a <code>func(io.Reader)</code> with
+it. Thus, function arguments <em>reverse</em> the subtype relationship: If A is a
+subtype of B, then <code>func(B)</code> could be a subtype of <code>func(A)</code>. This is called
+<em>contravariance</em>.</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">F</span><span class="p">(</span><span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">useReader</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">G</span><span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">useReader</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Use</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">))</span> <span class="p">{</span>
+    <span class="nx">b</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+    <span class="nx">f</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">Use</span><span class="p">(</span><span class="nx">F</span><span class="p">)</span> <span class="c1">// Doesn&#39;t work right now; but *could* be made equivalent to…</span>
+    <span class="nx">Use</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="p">{</span> <span class="nx">F</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span> <span class="p">})</span>
+
+    <span class="nx">Use</span><span class="p">(</span><span class="nx">G</span><span class="p">)</span> <span class="c1">// Works</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>So, <code>func</code> is contravariant for arguments and covariant for return values. Of
+course, we can combine the two: If A and C are subtypes of B and D
+respectively, we can make <code>func(B) C</code> a subtype of <code>func(A) D</code>, by converting
+like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// *os.PathError implements error</span>
+
+<span class="kd">func</span> <span class="nx">F</span><span class="p">(</span><span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="o">*</span><span class="nx">os</span><span class="p">.</span><span class="nx">PathError</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Use</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">b</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+    <span class="nx">err</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+    <span class="nx">useError</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">Use</span><span class="p">(</span><span class="nx">F</span><span class="p">)</span> <span class="c1">// Could be made to be equivalent to</span>
+    <span class="nx">Use</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span> <span class="k">return</span> <span class="nx">F</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span> <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>However, <code>func(A) C</code> and <code>func(B) D</code> are incompatible. Neither can be a subtype
+of the other:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">F</span><span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="o">*</span><span class="nx">os</span><span class="p">.</span><span class="nx">PathError</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">UseF</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">b</span> <span class="o">:=</span> <span class="nx">strings</span><span class="p">.</span><span class="nx">NewReader</span><span class="p">(</span><span class="s">&quot;foobar&quot;</span><span class="p">)</span>
+    <span class="nx">err</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">(</span><span class="nx">b</span><span class="p">)</span>
+    <span class="nx">useError</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">G</span><span class="p">(</span><span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">UseG</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="o">*</span><span class="nx">os</span><span class="p">.</span><span class="nx">PathErorr</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">b</span> <span class="o">:=</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+    <span class="nx">err</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">()</span>
+    <span class="nx">usePathError</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">UseF</span><span class="p">(</span><span class="nx">F</span><span class="p">)</span> <span class="c1">// Can&#39;t work, because:</span>
+    <span class="nx">UseF</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">r</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">F</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span> <span class="c1">// type-error: io.Reader is not *bytes.Buffer</span>
+    <span class="p">})</span>
+
+    <span class="nx">UseG</span><span class="p">(</span><span class="nx">G</span><span class="p">)</span> <span class="c1">// Can&#39;t work, because:</span>
+    <span class="nx">UseG</span><span class="p">(</span><span class="kd">func</span><span class="p">(</span><span class="nx">r</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span> <span class="o">*</span><span class="nx">os</span><span class="p">.</span><span class="nx">PathError</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="nx">G</span><span class="p">(</span><span class="nx">r</span><span class="p">)</span> <span class="c1">// type-error: error is not *os.PathError</span>
+    <span class="p">})</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>So in this case, there just <em>is</em> not relationship between the composite types.
+This is called <em>invariance</em>.</p>
+
+<hr>
+
+<p>Now, we can get back to our opening question: Why can&#39;t you use <code>[]int</code> as
+<code>[]interface{}</code>? This really is the question &quot;Why are slice-types invariant&quot;?.
+The questioner assumes that because <code>int</code> is a subtype of <code>interface{}</code>, we
+should also make <code>[]int</code> a subtype of <code>[]interface{}</code>. However, we can now see
+a simple problem with that. Slices support (among other things) two fundamental
+operations, that we can roughly translate into function calls:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="nx">as</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="nx">A</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+<span class="nx">a</span> <span class="o">:=</span> <span class="nx">as</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>      <span class="c1">// func Get(as []A, i int) A</span>
+<span class="nx">as</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="p">=</span> <span class="nx">a</span>       <span class="c1">// func Set(as []A, i int, a A)</span>
+</code></pre></div>
+<p>This shows a clear problem: The type A appears <em>both</em> as an argument <em>and</em>
+as a return type. So it appears both covariantly and contravariantly. So while
+with functions there is a relatively clear-cut answer to how variance might
+work, it just doesn&#39;t make a lot of sense for slices. Reading from it would
+require covariance but writing to it would require contravariance. In other
+words: If you&#39;d make <code>[]int</code> a subtype of <code>[]interface{}</code> you&#39;d need to explain
+how this code would work:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">G</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">v</span> <span class="o">:=</span> <span class="p">[]</span><span class="kt">int</span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">}</span>
+    <span class="nx">F</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+    <span class="nx">fmt</span><span class="p">.</span><span class="nx">Println</span><span class="p">(</span><span class="nx">v</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">F</span><span class="p">(</span><span class="nx">v</span> <span class="p">[]</span><span class="kd">interface</span><span class="p">{})</span> <span class="p">{</span>
+    <span class="c1">// string is a subtype of interface{}, so this should be valid</span>
+    <span class="nx">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">=</span> <span class="s">&quot;Oops&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Channels give another interesting perspective here. The bidirectional channel
+type has the same issue as slices: Receiving requires covariance, whereas
+sending requires contravariance. But you can restrict the directionality of a
+channel and only allow send- or receive-operations respectively. So while <code>chan
+A</code> and <code>chan B</code> would not be related, we could make <code>&lt;-chan A</code> a subtype of
+<code>&lt;-chan B</code>. And <code>chan&lt;- B</code> a subtype of <code>chan&lt;- A</code>.</p>
+
+<p>In that sense, <a href="https://github.com/golang/go/issues/22876">read-only types</a>
+have the potential to at least theoretically allow variance for slices. While
+<code>[]int</code> still wouldn&#39;t be a subtype of <code>[]interface{}</code>, we could make <code>ro
+[]int</code> a subtype of <code>ro []interface{}</code> (borrowing the syntax from the
+proposal).</p>
+
+<hr>
+
+<p>Lastly, I want to emphasize that all of these are just the <em>theoretical</em> issues
+with adding variance to Go&#39;s type system. I consider them harder, but even if
+we <em>could</em> solve them we would still run into practical issues. The most
+pressing of which is that subtypes have different memory representations:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">var</span> <span class="p">(</span>
+    <span class="c1">// super pseudo-code to illustrate</span>
+    <span class="nx">x</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span> <span class="c1">// unsafe.Pointer</span>
+    <span class="nx">y</span> <span class="nx">io</span><span class="p">.</span><span class="nx">ReadWriter</span> <span class="c1">// struct{ itable *itab; value unsafe.Pointer }</span>
+                    <span class="c1">// where itable has two entries</span>
+    <span class="nx">z</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span>     <span class="c1">// struct{ itable *itab; value unsafe.Pointer }</span>
+                    <span class="c1">// where itable has one entry</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>So even though you might think that all interfaces have the same memory
+representation, they actually don&#39;t, because the method tables have a different
+assumed layout. So in code like this</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Do</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">()</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">r</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">()</span>
+    <span class="nx">r</span><span class="p">.</span><span class="nx">Read</span><span class="p">(</span><span class="nx">buf</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">F</span><span class="p">()</span> <span class="nx">io</span><span class="p">.</span><span class="nx">Reader</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">G</span><span class="p">()</span> <span class="nx">io</span><span class="p">.</span><span class="nx">ReadWriter</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">H</span><span class="p">()</span> <span class="o">*</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">new</span><span class="p">(</span><span class="nx">bytes</span><span class="p">.</span><span class="nx">Buffer</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="c1">// All of F, G, H should be subtypes of func() io.Reader</span>
+    <span class="nx">Do</span><span class="p">(</span><span class="nx">F</span><span class="p">)</span>
+    <span class="nx">Do</span><span class="p">(</span><span class="nx">G</span><span class="p">)</span>
+    <span class="nx">Do</span><span class="p">(</span><span class="nx">H</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>there still needs to be a place where the return value of <code>H</code> is wrapped into
+an <code>io.Reader</code> and there needs to be a place where the itable of the return
+value of <code>G</code> is transformed into the correct format expected for an
+<code>io.Reader</code>. This isn&#39;t a <em>huge</em> problem for <code>func</code>: The compiler can
+generate the appropriate wrappers at the call site in <code>main</code>.
+There is a performance overhead, but only code that actually uses this form of
+subtyping needs to pay it. However, it becomes significant problem for slices.</p>
+
+<p>For slices, we must either a) convert the <code>[]int</code> into an <code>[]interface{}</code> when
+passing it, meaning an allocation and complete copy. Or b) delay the conversion
+between <code>int</code> and <code>interface{}</code> until the access, which would mean that every
+slice access now has to go through an indirect function call - just <em>in case</em>
+anyone would ever pass us a subtype of what we are expecting. Both options
+seem prohibitively expensive for Go&#39;s goals.</p>
+
+</article>
+
+    </main>
+
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
+        </div>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
+</html>
