@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-09-05T02:01:12+00:00</updated>
+  <updated>2018-09-05T12:25:40+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -22,18 +22,23 @@ as well. I hope to provide a more complete view of the design though.&lt;/strong
 
 &lt;p&gt;Recently a &lt;a href=&quot;https://go.googlesource.com/proposal/+/master/design/go2draft-generics-overview.md&quot;&gt;Problem Overview&lt;/a&gt;
 and &lt;a href=&quot;https://go.googlesource.com/proposal/+/master/design/go2draft-contracts.md&quot;&gt;Draft Design&lt;/a&gt;
-for generics in Go have dropped. Since then, predictably, there has been a
-bunch of chatter on the intertubez about it. This is a summary of my thoughts,
-so far, on the subject - after a bunch of discussions on Twitter and Reddit.&lt;/p&gt;
+for generics in Go have dropped. Since then, predictably,
+there has been a bunch of chatter on the intertubez about it. This is a
+summary of my thoughts, so far, on the subject - after a bunch of discussions
+on Twitter and Reddit.&lt;/p&gt;
+
+&lt;p&gt;Note: The design is called &amp;quot;Contracts&amp;quot;, but I will refer to it as &amp;quot;the design
+doc&amp;quot; here.  When I say &amp;quot;contracts&amp;quot;, I will refer to the specific part of the
+design to express constraints.&lt;/p&gt;
 
 &lt;h4 id=&quot;contracts-vs-interfaces&quot;&gt;Contracts vs. Interfaces&lt;/h4&gt;
 
-&lt;p&gt;First, there is a common observation of overlap between Contracts and Generics.
-To untangle that, we can say that when we say &amp;quot;generics&amp;quot;, what we mean is
+&lt;p&gt;First, there is a common observation of overlap between generics and interfaces.
+To untangle that, we can say that when we use &amp;quot;generics&amp;quot;, what we mean is
 &lt;em&gt;constrained parametric polymorphism&lt;/em&gt;. Go already allows polymorphism by using
-interfaces. Contracts add two things: One, a way to add &lt;em&gt;type-parameters&lt;/em&gt; to
+interfaces. This desgn doc add two things: One, a way to add &lt;em&gt;type-parameters&lt;/em&gt; to
 functions and types. And two, a syntax to constrain those type-parameters to a
-subset that allows specific operations.&lt;/p&gt;
+subset that allows specific operations, via &lt;em&gt;contracts&lt;/em&gt;.&lt;/p&gt;
 
 &lt;p&gt;The latter is where the overlap lies: Interfaces &lt;em&gt;already&lt;/em&gt; allow you to
 constrain arguments to types that allow certain operations. In a way, what
@@ -43,10 +48,10 @@ to allow or disallow certain composite types (though that mainly affects &lt;cod
 
 &lt;p&gt;Contracts allow that by the way they are specified: You write a function body
 (including arguments, whose notational type becomes the type-variable of the
-contract) containing all the statements/expressions you would wish to be able
+contract) containing all the statements/expressions you wish to be able
 to do. When instantiating a generic type/function with a given set of
 type-arguments, the compiler will try to substitute the corresponding
-type-variable in the contract body and allow the instantiation, if it
+type-variable in the contract body and allow the instantiation, if that body
 type-checks.&lt;/p&gt;
 
 &lt;h4 id=&quot;the-cost-of-contracts&quot;&gt;The cost of contracts&lt;/h4&gt;
@@ -54,7 +59,7 @@ type-checks.&lt;/p&gt;
 &lt;p&gt;After talking a bit through some examples, I feel that contracts optimize for
 the wrong thing. The analogy I came up with is vocabulary vs. grammar.&lt;/p&gt;
 
-&lt;p&gt;The Contracts design is appealing to a good degree, because it uses familiar
+&lt;p&gt;The contracts design is appealing to a good degree, because it uses familiar
 &lt;em&gt;syntax&lt;/em&gt;: You don&amp;#39;t have to learn any new syntax or language to express your
 contract. Just write natural Go code and have that express your constraints for
 you. I call this the &amp;quot;grammar&amp;quot; of constraints: The structure that you use to
@@ -69,7 +74,7 @@ the set of constraints that my algorithm needs?&lt;/p&gt;
 
 &lt;p&gt;The issue now, is that while the grammar of constraints might be obvious, it is
 not always clear what the actual semantic constraints that generates &lt;em&gt;are&lt;/em&gt;. A
-simple example is map-keys. The draft design uses the contract&lt;/p&gt;
+simple example is map-keys. The design doc uses the contract&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;&lt;span&gt;&lt;/span&gt;contract comparable (t T) {
    t == t
 }
@@ -139,10 +144,10 @@ nonsensical. Disallowing these, however, opens questions about the claim of
 familiar Go syntax, as we now have to make decisions what sort of expressions
 and statements we do or don&amp;#39;t allow in a contract.&lt;/p&gt;
 
-&lt;p&gt;This is why I say Contracts optimize for grammar, instead of vocabulary. The
-programmer is interested in the vocabulary - what does the Contract actually
-&lt;em&gt;mean&lt;/em&gt; and what Contract should they use? But the vocabulary is obscured by the
-grammar - because we use Go syntax, to understand a given Contract we need to
+&lt;p&gt;This is why I say contracts optimize for grammar, instead of vocabulary. The
+programmer is interested in the vocabulary - what does the contract actually
+&lt;em&gt;mean&lt;/em&gt; and what contract should they use? But the vocabulary is obscured by the
+grammar - because we use Go syntax, to understand a given contract we need to
 know a bunch of things about what the compiler is and is not able to infer from
 it.&lt;/p&gt;
 
@@ -161,7 +166,7 @@ should point out, that - for now - I&amp;#39;m intentionally optimizing for simp
 of the design, at the cost of some boilerplate and some loss of power. I will
 later try and provide some alternatives to compensate for that in part. But
 there is still likely going to remain a net cost in expressiveness. Personally,
-I think that tradeoff is worth exploring..&lt;/p&gt;
+I think that tradeoff is worth exploring.&lt;/p&gt;
 
 &lt;p&gt;The new design would retain type-parameters and most of their syntax. The
 difference is that type-parameters are a full argument list. The type of an
@@ -223,8 +228,8 @@ func main() {
   fmt.Println(path)
 }
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
-&lt;p&gt;The last example is relevant to the difference in power between Contracts and
-Interfaces: Usage of operators. We can still express the concept, but this is
+&lt;p&gt;The last example is relevant to the difference in power between contracts and
+interfaces: Usage of operators. We can still express the concept, but this is
 where the increased boilerplate comes in:&lt;/p&gt;
 &lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;&lt;span&gt;&lt;/span&gt;func Max(type T)(a, b T, less func(T, T) bool) T {
   if less(a, b) {
@@ -240,9 +245,9 @@ func main() {
 &lt;p&gt;I will try to show some ways to get rid of that boilerplate later. For now,
 let&amp;#39;s just treat it as a necessary evil of this idea. Though it should be
 mentioned, that while this is more &lt;em&gt;cumbersome&lt;/em&gt;, it&amp;#39;s still just as &lt;em&gt;typesafe&lt;/em&gt;
-as Contracts (as opposed to, say, a reflect-based generic &lt;code&gt;Max&lt;/code&gt;).&lt;/p&gt;
+as contracts (as opposed to, say, a reflect-based generic &lt;code&gt;Max&lt;/code&gt;).&lt;/p&gt;
 
-&lt;p&gt;So, scrapping Contracts leaves us with more boilerplate, but just the same set
+&lt;p&gt;So, scrapping contracts leaves us with more boilerplate, but just the same set
 of concepts we can express - though we do have to pass in any builtin
 operations we want to perform as extra functions (or express them in an
 interface). In exchange, we get&lt;/p&gt;
@@ -295,18 +300,18 @@ receiver type, &lt;code&gt;Ordered&lt;/code&gt; might look something like this:&
   &lt;span class=&quot;nx&quot;&gt;Less&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt;
 &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
 
-&lt;span class=&quot;c1&quot;&gt;// In the universe block&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;// Implements Ordered(int).&lt;/span&gt;
-&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Less&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-  &lt;span class=&quot;nx&quot;&gt;retun&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
 &lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Max&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;type&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Ordered&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;T&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
   &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;Less&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
     &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt;
   &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
   &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// In the universe block:&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// Implements Ordered(int).&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;func&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;Less&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;int&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;bool&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+  &lt;span class=&quot;nx&quot;&gt;retun&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;b&lt;/span&gt;
 &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Though it&amp;#39;s not clear, whether a parameter like &lt;code&gt;T Ordered(T)&lt;/code&gt; should be
@@ -398,27 +403,30 @@ having &lt;code&gt;!=&lt;/code&gt;, or having &lt;code&gt;-&lt;/code&gt; implyin
 good thing - it limits the abuse of operator overloading for nonsensical
 operations (say, &lt;code&gt;&amp;lt;&amp;lt;&lt;/code&gt; for writing to an &lt;code&gt;io.Writer&lt;/code&gt;).&lt;/p&gt;
 
+&lt;p&gt;I&amp;#39;m not trying to advocate for operator overloading, but think it&amp;#39;s worth
+mentioning that this design leaves the door open to that.&lt;/p&gt;
+
 &lt;h5 id=&quot;but-performance&quot;&gt;But performance&lt;/h5&gt;
 
 &lt;p&gt;A possible criticism of either of these approaches is, that operators have
 better performance than dynamic dispatch to a method. I believe (vigorous
 handwaving ahead) that this is no different in the existing contracts proposal.
-If generic code is compiled generically, it still needs to employ some method
+If generic code is compiled generically, it still needs to employ some means
 of dynamic dispatch for operators. If, on the other hand, it&amp;#39;s compiled
 instantiated, then the compiler would also be able to devirtualize the
 interfaces - and then inline the method definition.&lt;/p&gt;
 
 &lt;h4 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h4&gt;
 
-&lt;p&gt;I&amp;#39;ve previously said that I&amp;#39;m &amp;quot;meh&amp;quot; on the contracts proposal, which is the
-strongest form of endorsement a generics proposal could ever get from me. After
-some discussion, I&amp;#39;m more and more convinced that while contracts &lt;em&gt;seem&lt;/em&gt;
+&lt;p&gt;I&amp;#39;ve previously said that I&amp;#39;m &amp;quot;meh&amp;quot; on the design doc, which is the strongest
+form of endorsement a generics proposal could ever get from me. After some
+discussion, I&amp;#39;m more and more convinced that while contracts &lt;em&gt;seem&lt;/em&gt;
 conceptually simple, they create a plethora of implementation- and usage
 questions. I&amp;#39;m not sure, the supposed advantage of contracts, of a well-known
-syntax, holds up to scrutiny, when it comes to mapping that to the actually
-derived constraints or writing contracts. There are also a bunch of open
-questions in regards to contracts, a bunch of them related to the ambiguity
-of Go-expressions. As a result, I&amp;#39;m starting to feel more negative towards them
+syntax, holds up to scrutiny when it comes to mapping that to the actually
+derived constraints or writing contracts. There are also many open questions in
+regards to contracts, a bunch of them related to the ambiguity of
+Go-expressions. As a result, I&amp;#39;m starting to feel more negative towards them
 - they &lt;em&gt;look&lt;/em&gt; like an elegant idea, but in practice, they have a lot of weird
 corners.&lt;/p&gt;
 
@@ -428,7 +436,7 @@ The difference is mainly the absence of operator methods in favor of
 pseudo-interfaces or explicit method calls. This design also handwaves a
 couple of important implementation questions - the justification for that is
 that these questions (e.g. type inference and code generation) should be able
-to be taken from the Contracts design with minimal changes. It&amp;#39;s entirely
+to be taken from the design doc with minimal changes. It&amp;#39;s entirely
 possible that I am overlooking something, though.&lt;/p&gt;
 </content>
   </entry>

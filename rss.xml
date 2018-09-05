@@ -24,18 +24,23 @@ as well. I hope to provide a more complete view of the design though.**
 
 Recently a [Problem Overview](https://go.googlesource.com/proposal/+/master/design/go2draft-generics-overview.md)
 and [Draft Design](https://go.googlesource.com/proposal/+/master/design/go2draft-contracts.md)
-for generics in Go have dropped. Since then, predictably, there has been a
-bunch of chatter on the intertubez about it. This is a summary of my thoughts,
-so far, on the subject - after a bunch of discussions on Twitter and Reddit.
+for generics in Go have dropped. Since then, predictably,
+there has been a bunch of chatter on the intertubez about it. This is a
+summary of my thoughts, so far, on the subject - after a bunch of discussions
+on Twitter and Reddit.
+
+Note: The design is called "Contracts", but I will refer to it as "the design
+doc" here.  When I say "contracts", I will refer to the specific part of the
+design to express constraints.
 
 #### Contracts vs. Interfaces
 
-First, there is a common observation of overlap between Contracts and Generics.
-To untangle that, we can say that when we say "generics", what we mean is
+First, there is a common observation of overlap between generics and interfaces.
+To untangle that, we can say that when we use "generics", what we mean is
 *constrained parametric polymorphism*. Go already allows polymorphism by using
-interfaces. Contracts add two things: One, a way to add *type-parameters* to
+interfaces. This desgn doc add two things: One, a way to add *type-parameters* to
 functions and types. And two, a syntax to constrain those type-parameters to a
-subset that allows specific operations.
+subset that allows specific operations, via *contracts*.
 
 The latter is where the overlap lies: Interfaces *already* allow you to
 constrain arguments to types that allow certain operations. In a way, what
@@ -45,10 +50,10 @@ to allow or disallow certain composite types (though that mainly affects `map`).
 
 Contracts allow that by the way they are specified: You write a function body
 (including arguments, whose notational type becomes the type-variable of the
-contract) containing all the statements/expressions you would wish to be able
+contract) containing all the statements/expressions you wish to be able
 to do. When instantiating a generic type/function with a given set of
 type-arguments, the compiler will try to substitute the corresponding
-type-variable in the contract body and allow the instantiation, if it
+type-variable in the contract body and allow the instantiation, if that body
 type-checks.
 
 #### The cost of contracts
@@ -56,7 +61,7 @@ type-checks.
 After talking a bit through some examples, I feel that contracts optimize for
 the wrong thing. The analogy I came up with is vocabulary vs. grammar.
 
-The Contracts design is appealing to a good degree, because it uses familiar
+The contracts design is appealing to a good degree, because it uses familiar
 *syntax*: You don't have to learn any new syntax or language to express your
 contract. Just write natural Go code and have that express your constraints for
 you. I call this the "grammar" of constraints: The structure that you use to
@@ -71,7 +76,7 @@ the set of constraints that my algorithm needs?
 
 The issue now, is that while the grammar of constraints might be obvious, it is
 not always clear what the actual semantic constraints that generates *are*. A
-simple example is map-keys. The draft design uses the contract
+simple example is map-keys. The design doc uses the contract
 
 ```
 contract comparable (t T) {
@@ -159,10 +164,10 @@ nonsensical. Disallowing these, however, opens questions about the claim of
 familiar Go syntax, as we now have to make decisions what sort of expressions
 and statements we do or don't allow in a contract.
 
-This is why I say Contracts optimize for grammar, instead of vocabulary. The
-programmer is interested in the vocabulary - what does the Contract actually
-*mean* and what Contract should they use? But the vocabulary is obscured by the
-grammar - because we use Go syntax, to understand a given Contract we need to
+This is why I say contracts optimize for grammar, instead of vocabulary. The
+programmer is interested in the vocabulary - what does the contract actually
+*mean* and what contract should they use? But the vocabulary is obscured by the
+grammar - because we use Go syntax, to understand a given contract we need to
 know a bunch of things about what the compiler is and is not able to infer from
 it.
 
@@ -181,7 +186,7 @@ should point out, that - for now - I'm intentionally optimizing for simplicity
 of the design, at the cost of some boilerplate and some loss of power. I will
 later try and provide some alternatives to compensate for that in part. But
 there is still likely going to remain a net cost in expressiveness. Personally,
-I think that tradeoff is worth exploring..
+I think that tradeoff is worth exploring.
 
 The new design would retain type-parameters and most of their syntax. The
 difference is that type-parameters are a full argument list. The type of an
@@ -249,8 +254,8 @@ func main() {
 }
 ```
 
-The last example is relevant to the difference in power between Contracts and
-Interfaces: Usage of operators. We can still express the concept, but this is
+The last example is relevant to the difference in power between contracts and
+interfaces: Usage of operators. We can still express the concept, but this is
 where the increased boilerplate comes in:
 
 ```
@@ -269,9 +274,9 @@ func main() {
 I will try to show some ways to get rid of that boilerplate later. For now,
 let's just treat it as a necessary evil of this idea. Though it should be
 mentioned, that while this is more *cumbersome*, it's still just as *typesafe*
-as Contracts (as opposed to, say, a reflect-based generic `Max`).
+as contracts (as opposed to, say, a reflect-based generic `Max`).
 
-So, scrapping Contracts leaves us with more boilerplate, but just the same set
+So, scrapping contracts leaves us with more boilerplate, but just the same set
 of concepts we can express - though we do have to pass in any builtin
 operations we want to perform as extra functions (or express them in an
 interface). In exchange, we get
@@ -327,18 +332,18 @@ type Ordered(T) interface {
   Less(T) bool
 }
 
-// In the universe block
-
-// Implements Ordered(int).
-func (a int) Less(b int) bool {
-  retun a < b
-}
-
 func Max(type T Ordered(T)) (a, b T) T {
   if a.Less(b) {
     return b
   }
   return a
+}
+
+// In the universe block:
+
+// Implements Ordered(int).
+func (a int) Less(b int) bool {
+  retun a < b
 }
 ```
 
@@ -446,27 +451,30 @@ having `!=`, or having `-` implying having `+`. Personally, I consider that a
 good thing - it limits the abuse of operator overloading for nonsensical
 operations (say, `<<` for writing to an `io.Writer`).
 
+I'm not trying to advocate for operator overloading, but think it's worth
+mentioning that this design leaves the door open to that.
+
 ##### But performance
 
 A possible criticism of either of these approaches is, that operators have
 better performance than dynamic dispatch to a method. I believe (vigorous
 handwaving ahead) that this is no different in the existing contracts proposal.
-If generic code is compiled generically, it still needs to employ some method
+If generic code is compiled generically, it still needs to employ some means
 of dynamic dispatch for operators. If, on the other hand, it's compiled
 instantiated, then the compiler would also be able to devirtualize the
 interfaces - and then inline the method definition.
 
 #### Conclusion
 
-I've previously said that I'm "meh" on the contracts proposal, which is the
-strongest form of endorsement a generics proposal could ever get from me. After
-some discussion, I'm more and more convinced that while contracts *seem*
+I've previously said that I'm "meh" on the design doc, which is the strongest
+form of endorsement a generics proposal could ever get from me. After some
+discussion, I'm more and more convinced that while contracts *seem*
 conceptually simple, they create a plethora of implementation- and usage
 questions. I'm not sure, the supposed advantage of contracts, of a well-known
-syntax, holds up to scrutiny, when it comes to mapping that to the actually
-derived constraints or writing contracts. There are also a bunch of open
-questions in regards to contracts, a bunch of them related to the ambiguity
-of Go-expressions. As a result, I'm starting to feel more negative towards them
+syntax, holds up to scrutiny when it comes to mapping that to the actually
+derived constraints or writing contracts. There are also many open questions in
+regards to contracts, a bunch of them related to the ambiguity of
+Go-expressions. As a result, I'm starting to feel more negative towards them
 - they *look* like an elegant idea, but in practice, they have a lot of weird
 corners.
 
@@ -476,7 +484,7 @@ The difference is mainly the absence of operator methods in favor of
 pseudo-interfaces or explicit method calls. This design also handwaves a
 couple of important implementation questions - the justification for that is
 that these questions (e.g. type inference and code generation) should be able
-to be taken from the Contracts design with minimal changes. It's entirely
+to be taken from the design doc with minimal changes. It's entirely
 possible that I am overlooking something, though.
 ]]></content:encoded>
       <dc:date>2018-09-05T04:00:00+00:00</dc:date>
