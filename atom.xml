@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-09-05T12:25:40+00:00</updated>
+  <updated>2018-09-05T23:48:03+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -36,7 +36,7 @@ design to express constraints.&lt;/p&gt;
 &lt;p&gt;First, there is a common observation of overlap between generics and interfaces.
 To untangle that, we can say that when we use &amp;quot;generics&amp;quot;, what we mean is
 &lt;em&gt;constrained parametric polymorphism&lt;/em&gt;. Go already allows polymorphism by using
-interfaces. This desgn doc add two things: One, a way to add &lt;em&gt;type-parameters&lt;/em&gt; to
+interfaces. This desgn doc adds two things: One, a way to add &lt;em&gt;type-parameters&lt;/em&gt; to
 functions and types. And two, a syntax to constrain those type-parameters to a
 subset that allows specific operations, via &lt;em&gt;contracts&lt;/em&gt;.&lt;/p&gt;
 

@@ -38,7 +38,7 @@ design to express constraints.
 First, there is a common observation of overlap between generics and interfaces.
 To untangle that, we can say that when we use "generics", what we mean is
 *constrained parametric polymorphism*. Go already allows polymorphism by using
-interfaces. This desgn doc add two things: One, a way to add *type-parameters* to
+interfaces. This desgn doc adds two things: One, a way to add *type-parameters* to
 functions and types. And two, a syntax to constrain those type-parameters to a
 subset that allows specific operations, via *contracts*.
 
