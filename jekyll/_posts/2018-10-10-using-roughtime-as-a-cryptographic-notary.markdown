@@ -43,7 +43,7 @@ specific point in time. It also doesn't actually prove that you had the file,
 but only the hash. This can be remediated though. If we run a regular roughtime
 request, the resulting response is unpredictable (to us) and signs the current
 time. Thus, if we use a hash of that response as a prefix "salt" of the file
-itself, the resulting hash proofs that we knew the file *aftery* that chain
+itself, the resulting hash proofs that we knew the file *after* that chain
 ran. We can then use that hash as a nonce for another roughtime chain and get a
 proof that we had the file at a specific point (or rather, a small interval) in
 time. Furthermore, we can opt to use the file-hash not as the nonce itself, but
