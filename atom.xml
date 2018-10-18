@@ -4,12 +4,73 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-09-05T23:48:03+00:00</updated>
+  <updated>2018-10-18T21:33:04+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
   </author>
 
+  
+  <entry>
+    <id>https://blog.merovius.de//2018/10/18/using-roughtime-as-a-cryptographic-notary</id>
+    <link type="text/html" rel="alternate" href="https://blog.merovius.de//2018/10/18/using-roughtime-as-a-cryptographic-notary.html"/>
+    <title>Using roughtime as a &quot;cryptographic notary&quot;</title>
+    <updated>2018-10-18T23:22:40+00:00</updated>
+    <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: Roughtime can be (ab)used for &lt;a href=&quot;https://en.wikipedia.org/wiki/Trusted_timestamping#Trusted_(digital)_timestamping&quot;&gt;Trusted Timestamping&lt;/a&gt;. I wrote a
+&lt;a href=&quot;https://github.com/Merovius/notary&quot;&gt;simple tool&lt;/a&gt; as a PoC&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Recently, &lt;a href=&quot;https://blog.cloudflare.com/roughtime/&quot;&gt;Cloudflare announced&lt;/a&gt; that they are now running a
+&lt;a href=&quot;https://roughtime.googlesource.com/roughtime/&quot;&gt;roughtime&lt;/a&gt; server. Roughtime is a cryptographically secured
+time-synchronization protocol - think NTP with signatures. For an actual
+description of how it works, I recommend reading the Cloudflare blog post. But
+at it&amp;#39;s very core (oversimplification ahead), the user chooses an arbitrary
+(usually randomly generated) nonce and the server signs it, plus the current
+time.&lt;/p&gt;
+
+&lt;p&gt;One thing roughtime adds on top of this, is the ability to build a chain of
+requests. This is achieved by taking a hash of a response, combining it with a
+randomly generated &amp;quot;blind&amp;quot; and using the combined hash as a nonce to the next
+request. The intended use-case of this is that if a server provides the wrong
+time or otherwise misbehaves, you can obtain cryptographic proof of that fact
+by getting a timestamped signature of its response from a different server. By
+storing the initial nonce, generated blinds and responses, the entire chain can
+be validated later.&lt;/p&gt;
+
+&lt;p&gt;When I saw Cloudflares announcement, my first thought was that it should be
+possible to use a roughtime server as a &lt;a href=&quot;https://en.wikipedia.org/wiki/Trusted_timestamping#Trusted_(digital)_timestamping&quot;&gt;Time Stamping Authority&lt;/a&gt;. The
+goal is, to obtain a cryptographic proof, that you owned a particular document
+at the current point in time - for example to ensure you can proof original
+authorship without publishing the document itself.&lt;/p&gt;
+
+&lt;p&gt;The simplest way to achieve this using roughtime is to use the SHA512 hash of
+the file as an initial nonce. That way, the roughtime server signs that hash
+together with the current time with their private key. By using the roughtime
+chain protocol, you can get that proof corroborated by multiple servers.&lt;/p&gt;
+
+&lt;p&gt;You can also think of extending this, to get stronger properties. Using the
+hash of the file as a nonce only proves that the file existed &lt;em&gt;before&lt;/em&gt; that
+specific point in time. It also doesn&amp;#39;t actually prove that you had the file,
+but only the hash. This can be remediated though. If we run a regular roughtime
+request, the resulting response is unpredictable (to us) and signs the current
+time. Thus, if we use a hash of that response as a prefix &amp;quot;salt&amp;quot; of the file
+itself, the resulting hash proofs that we knew the file &lt;em&gt;aftery&lt;/em&gt; that chain
+ran. We can then use that hash as a nonce for another roughtime chain and get a
+proof that we had the file at a specific point (or rather, a small interval) in
+time. Furthermore, we can opt to use the file-hash not as the nonce itself, but
+as a blind. The advantage is, that the blind is never transmitted over the
+network, so the actual proof is only available to us (if we use it as a nonce,
+an eavesdropper could intercept the proof). I illustrated these options in a
+&lt;a href=&quot;https://docs.google.com/presentation/d/1quTJfXHvBZCjKJgL6HjUFb_jhDF-PghBwm_lTFLAjdg/edit#slide=id.g43c753f2a5_1_542&quot;&gt;recent talk&lt;/a&gt; I gave on the subject.&lt;/p&gt;
+
+&lt;p&gt;These ideas are mostly academic. I&amp;#39;m not sure how useful these properties are
+in practice. Nevertheless, the idea intriguiged me enough to &lt;a href=&quot;https://github.com/Merovius/notary&quot;&gt;implement it&lt;/a&gt;
+in a simple tool. It&amp;#39;s in a pretty rough, proof-of-concept like shape and I
+don&amp;#39;t know if I will ever progress it from there. It also comes with a client
+implementation of the roughtime protocol in Go - initially I was not aware that
+there already was a Go implementation, but that also is not go-gettable. Either
+way, it was fun to implement it myself :)&lt;/p&gt;
+</content>
+  </entry>
   
   <entry>
     <id>https://blog.merovius.de//2018/09/05/scrapping_contracts</id>
