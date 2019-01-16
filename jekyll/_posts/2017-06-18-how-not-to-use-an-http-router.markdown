@@ -263,7 +263,7 @@ of your choice (flags, dependency injection,…) and gets wired up in `main`. Al
 
 #### Conclusion
 
-I hope I convinced you that routers *in and off itself* are harmful. Pulling
+I hope I convinced you that routers *in and of itself* are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
 an awful lot of complexity, making it hard to debug. And as no single existing
 router will contain all the complicated cleverness you want to base your
