@@ -4,7 +4,7 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2018-10-18T21:55:16+00:00</updated>
+  <updated>2019-01-16T06:33:10+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
@@ -4757,7 +4757,7 @@ of your choice (flags, dependency injection,…) and gets wired up in &lt;code&g
 
 &lt;h4 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h4&gt;
 
-&lt;p&gt;I hope I convinced you that routers &lt;em&gt;in and off itself&lt;/em&gt; are harmful. Pulling
+&lt;p&gt;I hope I convinced you that routers &lt;em&gt;in and of itself&lt;/em&gt; are harmful. Pulling
 the routing into one component means that that component needs to encapsulate
 an awful lot of complexity, making it hard to debug. And as no single existing
 router will contain all the complicated cleverness you want to base your
