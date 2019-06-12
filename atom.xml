@@ -4,12 +4,300 @@
   <title>Between a rock and a crazy place</title>
   <link href="https://blog.merovius.de/"/>
   <link type="application/atom+xml" rel="self" href="https://blog.merovius.de//atom.xml"/>
-  <updated>2019-01-16T06:33:10+00:00</updated>
+  <updated>2019-06-12T07:06:21+00:00</updated>
   <id>https://blog.merovius.de/</id>
   <author>
     <name>Axel Wagner</name>
   </author>
 
+  
+  <entry>
+    <id>https://blog.merovius.de//2019/06/12/birdseye-go</id>
+    <link type="text/html" rel="alternate" href="https://blog.merovius.de//2019/06/12/birdseye-go.html"/>
+    <title>A bird&#39;s eye view of Go</title>
+    <updated>2019-06-12T00:00:00+00:00</updated>
+    <content type="html">&lt;p&gt;&lt;strong&gt;tl;dr: I provide a very high-level overview of what Go-the-language means vs. Go-the-ecosystem vs. Go-an-implementation. I also try to provide specific references to what documentation is most useful for what purpose. See the bottom-most section for that.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;When we talk about &amp;quot;Go&amp;quot;, depending on context, we can mean very different
+things. This is my attempt at providing a very high-level overview of the
+language and ecosystem and to link to the relevant documentation about how each
+part fits together (it&amp;#39;s also a bit of a hodgepodge though, addressing
+individual random questions I encountered recently). So, let&amp;#39;s dive in:&lt;/p&gt;
+
+&lt;h4 id=&quot;the-go-programming-language&quot;&gt;The Go programming language&lt;/h4&gt;
+
+&lt;p&gt;The bottom turtle is Go, the programming language. It defines the format and
+meaning of source code and the authoritative source is
+&lt;a href=&quot;https://golang.org/ref/spec&quot;&gt;the Go language specification&lt;/a&gt;. If something
+doesn&amp;#39;t conform to the spec, it&amp;#39;s not &amp;quot;Go&amp;quot;. And conversely, if something
+&lt;em&gt;isn&amp;#39;t&lt;/em&gt; mentioned in the spec it&amp;#39;s not part of the language. The language spec
+is maintained by the Go team and versioned, with a new release roughly every
+six months. At the time I wrote this post, the newest release was version
+&lt;code&gt;1.12&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The domain of the spec are&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The grammar of the language&lt;/li&gt;
+&lt;li&gt;Types, values and their semantics&lt;/li&gt;
+&lt;li&gt;What identifiers are predeclared and what their meaning is&lt;/li&gt;
+&lt;li&gt;How Go programs get executed&lt;/li&gt;
+&lt;li&gt;The special package &lt;a href=&quot;https://golang.org/ref/spec#Package_unsafe&quot;&gt;unsafe&lt;/a&gt;
+(though not all of its semantics)&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The spec alone &lt;em&gt;should&lt;/em&gt; enable you to write a compiler for Go. And indeed,
+there are many different compilers.&lt;/p&gt;
+
+&lt;h4 id=&quot;a-go-compiler-and-runtime&quot;&gt;A Go compiler and runtime&lt;/h4&gt;
+
+&lt;p&gt;The language spec is a text document, which is not useful in and off itself.
+For that, you need software that actually implements these semantics. This is
+done in concert by a compiler (which analyzes and checks the source code and
+transforms it into an executable format) and a runtime (which provides the
+necessary environment to actually run the code). There are many such
+combinations and they all differ a bit more or a bit less. Examples are&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;gc&lt;/code&gt;, a compiler and runtime written in pure Go (with some assembly) by the
+Go team themselves and versioned and released together with the language.
+Unlike other such tools, &lt;code&gt;gc&lt;/code&gt; doesn&amp;#39;t &lt;em&gt;strictly&lt;/em&gt; separate the compiler,
+assembler and linker - they end up sharing a lot of code and some of the
+classical responsibilities move or are shared between them. As such, it&amp;#39;s in
+general not possible to e.g. link packages compiled by different versions of
+&lt;code&gt;gc&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/doc/install/gccgo&quot;&gt;gccgo and libgo&lt;/a&gt;, a frontend for gcc
+and a runtime. It&amp;#39;s written in C and maintained by the Go team. It lives in
+the gcc organization though and is released according to the gcc release
+schedule and thus often lags a bit behind the &amp;quot;latest&amp;quot; version of the Go
+spec.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://llvm.org/svn/llvm-project/llgo/trunk/README.TXT&quot;&gt;llgo&lt;/a&gt;, a frontend
+for LLVM. I don&amp;#39;t know much about it apart from that, obviously.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/gopherjs/gopherjs&quot;&gt;gopherjs&lt;/a&gt;, compiling Go code into
+javascript and using a javascript-VM plus some custom code as a runtime.
+Long-term, it&amp;#39;ll probably be made obsolete by &lt;code&gt;gc&lt;/code&gt; gaining native support for
+WebAssembly.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://tinygo.org/&quot;&gt;tinygo&lt;/a&gt;, an incomplete implementation targeting small
+code size. Runs on either bare-metal micro-controllers or WebAssembly VMs,
+with a custom runtime. Due to its limitations it doesn&amp;#39;t &lt;em&gt;technically&lt;/em&gt;
+implement Go - notably, it doesn&amp;#39;t include a garbage collector, concurrency
+or reflection.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;There are more, but this should already give you an overview over the variety
+of implementations. Each of these have their own idiosyncrasies and made
+potentially different choices for how to implement the language. Examples (some
+of them a bit exotic, to illustrate) where they might differ are&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Size of &lt;code&gt;int&lt;/code&gt;/&lt;code&gt;uint&lt;/code&gt; - the language allows them to be either 32 or 64 bit wide.&lt;/li&gt;
+&lt;li&gt;How fundamental functionalities of the runtime, like allocation, garbage
+collection or concurrency are implemented.&lt;/li&gt;
+&lt;li&gt;The order of ranging over a &lt;code&gt;map&lt;/code&gt; isn&amp;#39;t defined in the language - &lt;code&gt;gc&lt;/code&gt;
+famously explicitly randomizes it, &lt;code&gt;gopherjs&lt;/code&gt; uses (last time I checked)
+whatever the javascript implementation you are running on uses.&lt;/li&gt;
+&lt;li&gt;How much extra space &lt;code&gt;append&lt;/code&gt; allocates if it needs to - &lt;em&gt;not&lt;/em&gt; however,
+&lt;em&gt;when&lt;/em&gt; it allocates extra space.&lt;/li&gt;
+&lt;li&gt;How conversions between &lt;code&gt;unsafe.Pointer&lt;/code&gt; and &lt;code&gt;uintptr&lt;/code&gt; happen. &lt;code&gt;gc&lt;/code&gt;, in
+particular, comes with its own &lt;a href=&quot;https://godoc.org/unsafe#Pointer&quot;&gt;set of rules&lt;/a&gt;
+regarding when these conversions are valid and when they aren&amp;#39;t. In general,
+the &lt;code&gt;unsafe&lt;/code&gt; package is virtual and implemented in the compiler.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;In general, relying on details not mentioned in the spec (in particular the
+ones mentioned here) makes your program &lt;em&gt;compile&lt;/em&gt; with different compilers, but
+not &lt;em&gt;work&lt;/em&gt; as expected. So you should avoid it, if possible.&lt;/p&gt;
+
+&lt;p&gt;If you install Go via a &amp;quot;normal&amp;quot; way (by downloading it from the website, or
+installing it via a package manager), you&amp;#39;ll get &lt;code&gt;gc&lt;/code&gt; and the official
+runtime by the Go team. And if the context doesn&amp;#39;t imply otherwise, when
+we talk about how &amp;quot;Go does things&amp;quot; we usually refer to &lt;code&gt;gc&lt;/code&gt;. It&amp;#39;s the main
+implementation.&lt;/p&gt;
+
+&lt;h4 id=&quot;the-standard-library&quot;&gt;The standard library&lt;/h4&gt;
+
+&lt;p&gt;&lt;a href=&quot;https://golang.org/pkg/#stdlib&quot;&gt;The standard library&lt;/a&gt; is a set of packages
+that come with Go and can be relied upon to immediately build useful
+applications with. It, too, is maintained by the Go team and versioned and
+released together with the language and compiler. In general, the standard
+library of one implementation will only work with the compiler it comes with.
+The reason is that most (but not all) of the runtime is part of the standard
+library (mainly in the packages &lt;code&gt;runtime&lt;/code&gt;, &lt;code&gt;reflect&lt;/code&gt;, &lt;code&gt;syscall&lt;/code&gt;). As the
+compiler needs to generate code compatible with the used runtime, both need to
+come from the same version.  The &lt;em&gt;API&lt;/em&gt; of the standard library is stable and
+won&amp;#39;t change in incompatible ways, so a Go program written against a given
+version of the standard library will continue to work as expected with future
+versions of the compiler.&lt;/p&gt;
+
+&lt;p&gt;Some implementations use their own version of some or all of the standard
+library - in particular, the &lt;code&gt;runtime&lt;/code&gt;, &lt;code&gt;reflect&lt;/code&gt;, &lt;code&gt;unsafe&lt;/code&gt; and &lt;code&gt;syscall&lt;/code&gt;
+packages are completely implementation-defined. As an example, I believe that
+&lt;a href=&quot;https://cloud.google.com/appengine/docs/standard/go/&quot;&gt;AppEngine Standard&lt;/a&gt; used
+to re-define parts of the standard library for security and safety. In general,
+implementations try to make that transparent to the user though.&lt;/p&gt;
+
+&lt;p&gt;There is also a &lt;a href=&quot;https://golang.org/pkg/#subrepo&quot;&gt;separate set of repositories&lt;/a&gt;,
+colloquially referred to as &lt;code&gt;x&lt;/code&gt; or &amp;quot;the subrepositories&amp;quot;. They contain packages
+which are developed and maintained by the Go team with all the same processes,
+but are &lt;em&gt;not&lt;/em&gt; on the same release schedule as the language and have less strict
+compatibility guarantees (and commitment to maintainership) than &lt;a href=&quot;https://golang.org/doc/go1compat&quot;&gt;Go itself&lt;/a&gt;.
+The packages in there are either experimental (for potential future inclusion
+in the standard library), not widely useful enough to be included in the
+standard library or, in rare cases, a way for people on the Go team to work on
+code using the same review processes they are used to.&lt;/p&gt;
+
+&lt;p&gt;Again, when referring to &amp;quot;the standard library&amp;quot; devoid of extra context, we
+mean the officially maintained and distributed one, hosted on
+&lt;a href=&quot;https://golang.org/pkg&quot;&gt;golang.org&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h4 id=&quot;the-build-tool&quot;&gt;The build tool&lt;/h4&gt;
+
+&lt;p&gt;To make the language user-friendly, you need a build tool. The primary role of
+this tool is to find the package you want to compile, find all of its
+dependencies, and execute the compiler and linker with the arguments necessary
+to build them. Go (the language) has &lt;a href=&quot;https://golang.org/ref/spec#Packages&quot;&gt;support for packages&lt;/a&gt;,
+which combine multiple source files into one unit of compilation. And it
+defines how to import and use other packages. But importantly, it doesn&amp;#39;t
+define how import paths map to source files or how they are laid out on disk.
+As such, each build tool comes with its own ideas for this. It&amp;#39;s possible to
+use a generic build tool (like Make) for this purpose, but there are a bunch of
+Go-specific ones:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/cmd/go/&quot;&gt;The go tool&lt;/a&gt;¹ is the officially by the Go team
+maintained build tool. It is versioned and released with the language (and
+&lt;code&gt;gc&lt;/code&gt; and the standard library).  It expects a directory called &lt;code&gt;GOROOT&lt;/code&gt; (from
+an environment variable, with a compiled in default) to contain the compiler,
+the standard library and various other tools. And it expects all source code
+in a single directory called &lt;code&gt;GOPATH&lt;/code&gt; (from an environment variable,
+defaulting to &lt;code&gt;$HOME/go&lt;/code&gt; or equivalent). Specifically, package &lt;code&gt;a/b&lt;/code&gt; is
+expected to have its source at &lt;code&gt;$GOPATH/src/a/b/c.go&lt;/code&gt; etc. And
+&lt;code&gt;$GOPATH/src/a/b&lt;/code&gt; is expected to &lt;em&gt;only&lt;/em&gt; contain source files of one package.
+It also has a mechanism to
+&lt;a href=&quot;https://golang.org/cmd/go/#hdr-Remote_import_paths&quot;&gt;download a package and its dependencies recursively from an arbitrary server&lt;/a&gt;,
+in a fully decentralized scheme, though it does not support versioning or
+verification of downloads. The go tool also contains extra tooling for
+testing Go code, reading documentation (&lt;a href=&quot;https://golang.org&quot;&gt;golang.org&lt;/a&gt; is
+served by the Go tool), file bugs, run various tools…&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/gopherjs/gopherjs&quot;&gt;gopherjs&lt;/a&gt; comes with its own build
+tool, that largely mimics the Go tool.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/golang/go/wiki/Mobile&quot;&gt;gomobile&lt;/a&gt; is a build tool
+specifically to build Go code for mobile operating systems.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/golang/dep&quot;&gt;dep&lt;/a&gt;, &lt;a href=&quot;https://getgb.io/&quot;&gt;gb&lt;/a&gt;,
+&lt;a href=&quot;https://glide.sh/&quot;&gt;glide&lt;/a&gt;,… are community-developed build-tools and
+dependency managers, each with their own approach to file layout (some are
+compatible with the go tool, some aren&amp;#39;t) and dependency declarations.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://bazel.build/&quot;&gt;bazel&lt;/a&gt; is the open source version of Google&amp;#39;s own
+build system. While it&amp;#39;s not actually Go-specific, I&amp;#39;m mentioning it
+explicitly due to common claims that idiosyncrasies of the go tool are
+intended to serve Google&amp;#39;s own use cases, in conflict with the needs of the
+community. However, the go tool (and many public tools) can&amp;#39;t be used at
+Google, because bazel uses an incompatible file layout.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The build tool is what most users directly interface with and as such, it&amp;#39;s
+what largely determines aspects of the &lt;em&gt;Go ecosystem&lt;/em&gt; and how packages can be
+combined and thus how different Go programmers interact. As above, the go tool
+is what&amp;#39;s implicitly referred to unless more context is given and thus its
+design decisions have largely influenced public opinion about &amp;quot;Go&amp;quot;. While there
+are alternative tools and they have wide adoption for use cases like
+company-internal code, the open source community &lt;em&gt;in general&lt;/em&gt; expects code to
+conform to the expectations of the go tool, which (among other things) means&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Be available as source code. The go tool has little support for binary
+distribution of packages and what little it has is going to be removed soon.&lt;/li&gt;
+&lt;li&gt;Be documented according to &lt;a href=&quot;https://blog.golang.org/godoc-documenting-go-code&quot;&gt;the godoc format&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/pkg/testing/#pkg-overview&quot;&gt;Have tests&lt;/a&gt; that can be run via &lt;code&gt;go test&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Be fully compilable by a &lt;code&gt;go build&lt;/code&gt; (together with the next one, this is
+usually called being &amp;quot;go-gettable&amp;quot;). In particular, to use &lt;a href=&quot;https://golang.org/pkg/cmd/go/internal/generate/&quot;&gt;go generate&lt;/a&gt;
+if generating source-code or metaprogramming is required and commit the generated
+artifacts.&lt;/li&gt;
+&lt;li&gt;Namespace import paths with a domain-name as the first component and have
+that domain-name either be a well-known code hoster or have a webserver
+running on it, so that &lt;a href=&quot;https://golang.org/cmd/go/#hdr-Remote_import_paths&quot;&gt;go get works&lt;/a&gt;
+and can find the source code of dependencies.&lt;/li&gt;
+&lt;li&gt;Have one package per directory and use &lt;a href=&quot;https://golang.org/pkg/go/build/#hdr-Build_Constraints&quot;&gt;build constraints&lt;/a&gt;
+for conditional compilation.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;The &lt;a href=&quot;https://golang.org/cmd/go&quot;&gt;documentation of the go tool&lt;/a&gt; is very
+comprehensive and probably a good starting point to learn how Go implements
+various ecosystem aspects.&lt;/p&gt;
+
+&lt;h4 id=&quot;tools&quot;&gt;Tools&lt;/h4&gt;
+
+&lt;p&gt;Go&amp;#39;s standard library includes &lt;a href=&quot;https://golang.org/pkg/go/&quot;&gt;several packages to interact with Go source code&lt;/a&gt;
+and the &lt;a href=&quot;https://godoc.org/golang.org/x/tools/go&quot;&gt;x/tools subrepo contains even more&lt;/a&gt;.
+As a result (and due to a strong desire to keep the canonical Go distribution
+lean), Go has developed a strong culture of developing third-party tools. In
+general, these tools need to know where to find source code though and might
+need access to type information. The &lt;a href=&quot;https://golang.org/pkg/go/build/&quot;&gt;go/build&lt;/a&gt;
+package implements the conventions used by the Go tool (and can thus also serve
+as documentation for parts of its build process). The downside is, that tools
+build on top of it sometimes don&amp;#39;t work with code relying on other build tools.
+That&amp;#39;s why there is a &lt;a href=&quot;https://godoc.org/golang.org/x/tools/go/packages&quot;&gt;new package in development&lt;/a&gt;
+which integrates nicely with other build tools.&lt;/p&gt;
+
+&lt;p&gt;By its nature, the list of Go tools is long and everybody has their own
+preferences. But broadly, they contain&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/cmd/&quot;&gt;Tools developed by the Go team and released as part of the distribution&lt;/a&gt;.
+. This includes tools for &lt;a href=&quot;https://golang.org/cmd/gofmt/&quot;&gt;automatically formatting source code&lt;/a&gt;,
+&lt;a href=&quot;https://golang.org/cmd/cover/&quot;&gt;coverage testing&lt;/a&gt;,
+&lt;a href=&quot;https://golang.org/cmd/trace/&quot;&gt;runtime tracing&lt;/a&gt; and
+&lt;a href=&quot;https://golang.org/cmd/pprof/&quot;&gt;profiling&lt;/a&gt;, a &lt;a href=&quot;https://golang.org/cmd/vet/&quot;&gt;static analyzer for common mistakes&lt;/a&gt;
+and &lt;a href=&quot;https://golang.org/cmd/fix/&quot;&gt;a mostly obsolete tool to migrate code to new Go versions&lt;/a&gt;.
+These are generally accesed via &lt;code&gt;go tool &amp;lt;cmd&amp;gt;&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://godoc.org/golang.org/x/tools/cmd&quot;&gt;Tools developed by the Go team and maintained out-of-tree&lt;/a&gt;.
+This includes tools to
+&lt;a href=&quot;https://godoc.org/golang.org/x/tools/cmd/present&quot;&gt;write blog posts and presentations&lt;/a&gt;,
+&lt;a href=&quot;https://godoc.org/golang.org/x/tools/cmd/eg&quot;&gt;easily do large refactors&lt;/a&gt;,
+&lt;a href=&quot;https://godoc.org/golang.org/x/tools/cmd/goimports&quot;&gt;automatically find and fix import paths&lt;/a&gt;
+and a &lt;a href=&quot;https://godoc.org/golang.org/x/tools/cmd/gopls&quot;&gt;language server&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;Third-party tools - too many to count. There are many lists of these,
+&lt;a href=&quot;https://github.com/avelino/awesome-go#tools&quot;&gt;here is one&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;in-summary&quot;&gt;In Summary&lt;/h4&gt;
+
+&lt;p&gt;I wanted to end this with a short list of references, for beginners who feel
+lost. So this is where you should go, if you…&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://tour.golang.org/welcome/1&quot;&gt;Want to start learning Go&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/doc/effective_go.html&quot;&gt;Want to understand how a specific language construct works&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/ref/spec&quot;&gt;Want to nitpick what is or is not valid Go and why&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/cmd/go/&quot;&gt;Want documentation about what the go tool does&lt;/a&gt;
+Also available via &lt;code&gt;go help&lt;/code&gt;. It sometimes references other topics, that you can also
+&lt;a href=&quot;https://golang.org/pkg/cmd/go/internal/help/&quot;&gt;see on the web&lt;/a&gt;, but not nicely.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://github.com/golang/go/wiki/CodeReviewComments&quot;&gt;Want to write code that adheres to community standards&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://golang.org/pkg/testing/#pkg-overview&quot;&gt;Want to test your code&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://godoc.org/&quot;&gt;Want to find new packages or look at documentation of public packages&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;There are, of course, many more useful supplementary documents, but this might
+serve as a good start. Please &lt;a href=&quot;https://twitter.com/TheMerovius&quot;&gt;let me know on Twitter&lt;/a&gt;
+if you are a beginner and there&amp;#39;s an area of Go you are missing from this
+overview (I might follow this up with more specific topics), or a specific
+reference you found helpful. You can also drop me a note if you&amp;#39;re a more
+experienced Gopher and think I missed something important (but keep in mind
+that I intentionally left out most references, so as to keep the ways
+forward crisp and clear :) ).&lt;/p&gt;
+
+&lt;hr&gt;
+
+&lt;p&gt;[1] Note: The Go team is currently rolling out support for &lt;em&gt;modules&lt;/em&gt;, which is
+    a unit of code distribution above packages, including support for versioning
+    and more infrastructure to solve some issues with the &amp;quot;traditional&amp;quot; go
+    tool. With that, basically everything in that paragraph becomes obsolete.
+    However, &lt;em&gt;for now&lt;/em&gt; the module support exists but is opt-in. And as the
+    point of this article is to provide an overview of the separation of
+    concerns, which doesn&amp;#39;t actually change, I felt it was better to stay
+    within ye olden days - &lt;em&gt;for now&lt;/em&gt;.&lt;/p&gt;
+</content>
+  </entry>
   
   <entry>
     <id>https://blog.merovius.de//2018/10/18/using-roughtime-as-a-cryptographic-notary</id>
