@@ -15,6 +15,10 @@ concrete implementation and towards the underlying problem.**
 
 *This blog post is relatively long. I encourage you to skip sections you find boring*
 
+**Update: I wrote a new post, detailing how the type-safety concerns of
+context.Value in light of the new design for generics. [You can check it out
+here](https://blog.merovius.de/2020/07/20/parametric-context.html)**
+
 ---
 
 Lately [this
