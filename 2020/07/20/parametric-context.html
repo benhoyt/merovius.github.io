@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <title>Parametric context</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/css/materialize.min.css">
+    <link rel="stylesheet" href="/css/syntax.css">
+    <link rel="stylesheet" href="/css/main.css">
+
+    <link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Between a rock and a crazy place">
+    <link rel="alternate" type="application/rss+xml" href="/rss.xml" title="Between a rock and a crazy place">
+    <link rel="alternate" type="application/json" href="/feed.json" title="Between a rock and a crazy place" >
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-MML-AM_CHTML'></script>
+	<meta name="author" content="Axel Wagner">
+	<meta name="keywords" content="golang,programming">
+  </head>
+  <body>
+    <header class="green darken-4 z-depth-2 valign-wrapper">
+	  <h3><a class="white-text" href="/">Between a rock and a crazy place</a></h1>
+    </header>
+
+    <main class="container">
+      <h3>Parametric context</h3>
+<p>2020-07-20</p>
+
+<article>
+<p><strong>tl;dr: Go&#39;s Context.Value is controversial because of a lack of type-safety. I design a solution for that based on the new generics design draft.</strong></p>
+
+<p>If you are following what&#39;s happening with Go, you are aware that recently
+<a href="https://blog.golang.org/generics-next-step">an updated design draft for generics has dropped</a>.
+What makes this particularly notable is that it comes with an actual prototype
+implementation of the draft, including a <a href="https://go2goplay.golang.org/">playground</a>.
+This means for the first time, people get to actually try out how a Go with
+generics might feel, once they get in. It is a good opportunity to look at
+common Go code lacking type-safety and evaluate if and how generics can help
+address them.</p>
+
+<p>One area I&#39;d like to look at here is <a href="https://godoc.org/context#Context.Value">Context.Value</a>. It is often criticized
+for not being explicit enough about the dependencies a function has and some
+people even go so far as to discourage its use altogether. On the other hand,
+I&#39;m on record <a href="https://blog.merovius.de/2017/08/14/why-context-value-matters-and-how-to-improve-it.html">saying that it is too useful to ignore</a>. Generics
+might be a way to bring together these viewpoints.</p>
+
+<p>We want to be able to declare dependency on a functionality in
+<code>context.Context</code> via a function&#39;s signature and make it impossible to call it
+without providing that functionality, while also preserving the ability to pass
+it through APIs that don&#39;t know anything about it. As an example of such
+functionality, I will use logging. Let&#39;s start by creating a fictional little
+library to do that (the names are not ideal, but let&#39;s not worry about that):</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kn">package</span> <span class="nx">logctx</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;context&quot;</span>
+    <span class="s">&quot;log&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">type</span> <span class="nx">LogContext</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="c1">// We embed a context.Context, to say that we are augmenting it with</span>
+    <span class="c1">// additional functionality.</span>
+    <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+
+    <span class="c1">// Logf logs the given values in the given format.</span>
+    <span class="nx">Logf</span><span class="p">(</span><span class="nx">format</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">values</span> <span class="o">...</span><span class="kd">interface</span><span class="p">{})</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">WithLog</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">l</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span><span class="p">)</span> <span class="nx">LogContext</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">logContext</span><span class="p">{</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">l</span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// logContext is unexported, to ensure it can&#39;t be modified.</span>
+<span class="kd">type</span> <span class="nx">logContext</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+    <span class="nx">l</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">logContext</span><span class="p">)</span> <span class="nx">Logf</span><span class="p">(</span><span class="nx">format</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">values</span> <span class="o">...</span><span class="kd">interface</span><span class="p">{})</span> <span class="p">{</span>
+    <span class="nx">ctx</span><span class="p">.</span><span class="nx">l</span><span class="p">.</span><span class="nx">Printf</span><span class="p">(</span><span class="nx">format</span><span class="p">,</span> <span class="nx">values</span><span class="o">...</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>You might notice that we are not actually using <code>Value()</code> here. This is
+fundamental to the idea of getting compiler-checks - we need some
+compiler-known way to &quot;tag&quot; functionality and that can&#39;t be <code>Value</code>. However,
+we provide the same functionality, by essentially adding an <a href="https://blog.merovius.de/2017/07/30/the-trouble-with-optional-interfaces.html">optional
+interface</a> to <code>context.Context</code>.</p>
+
+<p>If we want to use this, we could write</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Foo</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">logctx</span><span class="p">.</span><span class="nx">LogContext</span><span class="p">,</span> <span class="nx">v</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">ctx</span><span class="p">.</span><span class="nx">Logf</span><span class="p">(</span><span class="s">&quot;Foo(%v)&quot;</span><span class="p">,</span> <span class="nx">v</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">ctx</span> <span class="o">:=</span> <span class="nx">logctx</span><span class="p">.</span><span class="nx">WithLog</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span> <span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stderr</span><span class="p">,</span> <span class="s">&quot;&quot;</span><span class="p">,</span> <span class="nx">log</span><span class="p">.</span><span class="nx">LstdFlags</span><span class="p">))</span>
+    <span class="nx">Foo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>However, this has a huge problem: What if we want more than one functionality
+(each not knowing about the other)? We might try the same trick, say</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kn">package</span> <span class="nx">tracectx</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;context&quot;</span>
+
+    <span class="s">&quot;github.com/opentracing/opentracing-go&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">type</span> <span class="nx">TraceContext</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+    <span class="nx">Tracer</span><span class="p">()</span> <span class="nx">opentracing</span><span class="p">.</span><span class="nx">Tracer</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">WithTracer</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">t</span> <span class="nx">opentracing</span><span class="p">.</span><span class="nx">Tracer</span><span class="p">)</span> <span class="nx">TraceContext</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">traceContext</span><span class="p">{</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">t</span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">traceContext</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+    <span class="nx">t</span> <span class="nx">opentracing</span><span class="p">.</span><span class="nx">Tracer</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">traceContext</span><span class="p">)</span> <span class="nx">Tracer</span><span class="p">()</span> <span class="nx">opentracing</span><span class="p">.</span><span class="nx">Tracer</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">t</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>But because a <code>context.Context</code> is embedded, only those methods explicitly
+mentioned in that interface are added to <code>traceContext</code>. The <code>Logf</code> method is
+erased. After all, that is <a href="https://blog.merovius.de/2017/07/30/the-trouble-with-optional-interfaces.html">the trouble with optional interfaces</a>.</p>
+
+<p>This is where generics come in. We can change our wrapper-types and -functions like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">type</span> <span class="nx">LogContext</span><span class="p">(</span><span class="kd">type</span> <span class="nx">parent</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="c1">// the type-parameter is lower case, so the field is not exported.</span>
+    <span class="nx">parent</span>
+    <span class="nx">l</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">WithLog</span><span class="p">(</span><span class="kd">type</span> <span class="nx">Parent</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">Parent</span><span class="p">,</span> <span class="nx">l</span> <span class="o">*</span><span class="nx">log</span><span class="p">.</span><span class="nx">Logger</span><span class="p">)</span> <span class="nx">LogContext</span><span class="p">(</span><span class="nx">Parent</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nx">LogContext</span><span class="p">(</span><span class="nx">parent</span><span class="p">){</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">l</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>By adding a type-parameter and embedding it, we actually get <em>all</em> methods of
+the parent context on <code>LogContext</code>. We are no longer erasing them. After giving
+the <code>tracectx</code> package the same treatment, we can use them like this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// FooContext encapsulates all the dependencies of Foo in a context.Context.</span>
+<span class="kd">type</span> <span class="nx">FooContext</span> <span class="kd">interface</span> <span class="p">{</span>
+    <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+    <span class="nx">Logf</span><span class="p">(</span><span class="nx">format</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">values</span> <span class="o">...</span><span class="kd">interface</span><span class="p">{})</span>
+    <span class="nx">Tracer</span><span class="p">()</span> <span class="nx">opentracing</span><span class="p">.</span><span class="nx">Tracer</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">Foo</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">FooContext</span><span class="p">,</span> <span class="nx">v</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">span</span> <span class="o">:=</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">Tracer</span><span class="p">().</span><span class="nx">StartSpan</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">)</span>
+    <span class="k">defer</span> <span class="nx">span</span><span class="p">.</span><span class="nx">Finish</span><span class="p">()</span>
+
+    <span class="nx">ctx</span><span class="p">.</span><span class="nx">Logf</span><span class="p">(</span><span class="s">&quot;Foo(%v)&quot;</span><span class="p">,</span> <span class="nx">v</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">l</span> <span class="o">:=</span> <span class="nx">log</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stderr</span><span class="p">,</span> <span class="s">&quot;&quot;</span><span class="p">,</span> <span class="nx">log</span><span class="p">.</span><span class="nx">LstdFlags</span><span class="p">)</span>
+    <span class="nx">t</span> <span class="o">:=</span> <span class="nx">opentracing</span><span class="p">.</span><span class="nx">GlobalTracer</span><span class="p">()</span>
+    <span class="c1">// ctx has type TraceContext(LogContext(context.Context)),</span>
+    <span class="c1">//    which embeds a LogContext(context.Context),</span>
+    <span class="c1">//    which embeds a context.Context</span>
+    <span class="c1">// So it has all the required methods</span>
+    <span class="nx">ctx</span> <span class="o">:=</span> <span class="nx">tracectx</span><span class="p">.</span><span class="nx">WithTracer</span><span class="p">(</span><span class="nx">logctx</span><span class="p">.</span><span class="nx">WithLog</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">(),</span> <span class="nx">l</span><span class="p">),</span> <span class="nx">t</span><span class="p">)</span>
+    <span class="nx">Foo</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>Foo</code> has now fully declared its dependencies on a logger and a tracectx, without
+requiring any type-assertions or runtime-checks. The logging- and
+tracing-libraries don&#39;t know about each other and yet are able to wrap each
+other without loss of type-information. Constructing the context is not
+particularly ergonomic though. We require a long chained function call, because
+the values returned by the functions have no longer a unified type
+<code>context.Context</code> (so the <code>ctx</code> variable can&#39;t be re-used).</p>
+
+<p>Another thing to note is that we exported <code>LogContext</code> as a struct, instead of
+an interface. This is necessary, because we can&#39;t embed type-parameters into
+interfaces, but we <em>can</em> embed them as struct-fields. So this is the only way
+we can express that the returned type has all the methods the parameter type
+has. The downside is that we are making this a concrete type, which isn&#39;t
+always what we want<a href="#footnote1">¹</a><a id="footnote1_back"></a>.</p>
+
+<p>We have now succeeded in annotating <code>context.Context</code> with dependencies, but
+this alone is not super useful of course. We also need to be able to pass it
+through agnostic APIs (the fundamental problem <code>Context.Value</code> solves).
+However, this is easy enough to do.</p>
+
+<p>First, let&#39;s change the <code>context</code> API to use the same form of generic wrappers.
+This isn&#39;t backwards compatible, of course, but this entire blog post is a
+thought experiment, so we are ignoring that. I don&#39;t provide the full code
+here, for brevity&#39;s sake, but the basic API would change into this:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kn">package</span> <span class="nx">context</span>
+
+<span class="c1">// CancelContext is the generic version of the currently unexported cancelCtx.</span>
+<span class="kd">type</span> <span class="nx">CancelContext</span><span class="p">(</span><span class="kd">type</span> <span class="nx">parent</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">parent</span>
+    <span class="c1">// other fields</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">WithCancel</span><span class="p">(</span><span class="kd">type</span> <span class="nx">Parent</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">Parent</span><span class="p">)</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">CancelContext</span><span class="p">(</span><span class="nx">Parent</span><span class="p">),</span> <span class="nx">cancel</span> <span class="nx">CancelFunc</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c1">// ...</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This change is necessary to enable <code>WithCancel</code> to also preserve methods of the
+parent context. We can now use this in an API that passes through a parametric
+context.  For example, say we want to have an <a href="https://godoc.org/golang.org/x/sync/errgroup">errgroup</a> package, that passes
+the context through to the argument to <code>(*Group).Go</code>, instead of returning it
+from <code>WithContext</code>:</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="c1">// Derived from the current errgroup code.</span>
+
+<span class="c1">// A Group is a collection of goroutines working on subtasks that are part of the same overall task.</span>
+<span class="c1">//</span>
+<span class="c1">// A zero Group is invalid (as opposed to the original errgroup).</span>
+<span class="kd">type</span> <span class="nx">Group</span><span class="p">(</span><span class="kd">type</span> <span class="nx">Context</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">ctx</span>    <span class="nx">Context</span>
+    <span class="nx">cancel</span> <span class="kd">func</span><span class="p">()</span>
+
+    <span class="nx">wg</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">WaitGroup</span>
+
+    <span class="nx">errOnce</span> <span class="nx">sync</span><span class="p">.</span><span class="nx">Once</span>
+    <span class="nx">err</span>     <span class="kt">error</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">WithContext</span><span class="p">(</span><span class="kd">type</span> <span class="nx">C</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">(</span><span class="nx">ctx</span> <span class="nx">C</span><span class="p">)</span> <span class="o">*</span><span class="nx">Group</span><span class="p">(</span><span class="nx">C</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">ctx</span><span class="p">,</span> <span class="nx">cancel</span> <span class="o">:=</span> <span class="nx">context</span><span class="p">.</span><span class="nx">WithCancel</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
+    <span class="k">return</span> <span class="o">&amp;</span><span class="nx">Group</span><span class="p">(</span><span class="nx">C</span><span class="p">){</span><span class="nx">ctx</span><span class="p">:</span> <span class="nx">ctx</span><span class="p">,</span> <span class="nx">cancel</span><span class="p">:</span> <span class="nx">cancel</span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">g</span> <span class="o">*</span><span class="nx">Group</span><span class="p">(</span><span class="nx">Context</span><span class="p">))</span> <span class="nx">Wait</span><span class="p">()</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="nx">g</span><span class="p">.</span><span class="nx">wg</span><span class="p">.</span><span class="nx">Wait</span><span class="p">()</span>
+    <span class="k">return</span> <span class="nx">g</span><span class="p">.</span><span class="nx">err</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">g</span> <span class="o">*</span><span class="nx">Group</span><span class="p">(</span><span class="nx">Context</span><span class="p">))</span> <span class="nx">Go</span><span class="p">(</span><span class="nx">f</span> <span class="kd">func</span><span class="p">(</span><span class="nx">Context</span><span class="p">)</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">g</span><span class="p">.</span><span class="nx">wg</span><span class="p">.</span><span class="nx">Add</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">defer</span> <span class="nx">g</span><span class="p">.</span><span class="nx">wg</span><span class="p">.</span><span class="nx">Done</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">(</span><span class="nx">g</span><span class="p">.</span><span class="nx">ctx</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="nx">g</span><span class="p">.</span><span class="nx">errOnce</span><span class="p">.</span><span class="nx">Do</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+                <span class="nx">g</span><span class="p">.</span><span class="nx">err</span> <span class="p">=</span> <span class="nx">err</span>
+            <span class="p">})</span>
+        <span class="p">}</span>
+    <span class="p">}()</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Note that the code here has barely changed. It can be used as</p>
+<div class="highlight"><pre><code class="language-go" data-lang="go"><span></span><span class="kd">func</span> <span class="nx">Foo</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">FooContext</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="nx">span</span> <span class="o">:=</span> <span class="nx">ctx</span><span class="p">.</span><span class="nx">Tracer</span><span class="p">().</span><span class="nx">StartSpan</span><span class="p">(</span><span class="s">&quot;Foo&quot;</span><span class="p">)</span>
+    <span class="k">defer</span> <span class="nx">span</span><span class="p">.</span><span class="nx">Finish</span><span class="p">()</span>
+    <span class="nx">ctx</span><span class="p">.</span><span class="nx">Logf</span><span class="p">(</span><span class="s">&quot;Foo was called&quot;</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">ctx</span> <span class="nx">FooContext</span> <span class="p">=</span> <span class="nx">newFooContext</span><span class="p">()</span>
+    <span class="nx">eg</span> <span class="o">:=</span> <span class="nx">errgroup</span><span class="p">.</span><span class="nx">WithContext</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span>
+    <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="p">&lt;</span> <span class="mi">20</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span> <span class="p">{</span>
+        <span class="nx">eg</span><span class="p">.</span><span class="nx">Go</span><span class="p">(</span><span class="nx">Foo</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">eg</span><span class="p">.</span><span class="nx">Wait</span><span class="p">();</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+        <span class="nx">log</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>After playing around with this for a couple of days, I feel pretty confident
+that these patterns make it possible to get a fully type-safe version of
+<code>context.Context</code>, while preserving the ability to have APIs that pass it
+through untouched or augmented.</p>
+
+<p>A completely different question, of course, is whether all of this is a good
+idea. Personally, I am on the fence about it. It is definitely valuable, to
+have a type-safe version of <code>context.Context</code>. And I think it is impressive how
+small the impact of it is on the <em>users</em> of APIs written this way. The
+type-argument can almost always be inferred and writing code to make use of this
+is very natural - you just declare a suitable context-interface and take it as
+an argument. You can also freely pass it to functions taking a pure
+<code>context.Context</code> unimpeded.</p>
+
+<p>On the other hand, I am not completely convinced the cost is worth it. As soon
+as you do non-trivial things with a context, it becomes a pretty &quot;infectious&quot;
+change. For example, I played around with a <a href="https://go2goplay.golang.org/p/9-xQZufcGp_k">mock gRPC API</a> to allow
+interceptors to take a parametric context and it requires almost all types and
+functions involved to take a type-parameter. And this doesn&#39;t even touch on the
+fact that gRPC itself might want to add annotations to the context, which adds
+even more types. I am not sure if the additional machinery is really worth the
+benefit of some type-safety - especially as it&#39;s not always super intuitive and
+easily understandable. And even more so, if it needs to be combined with other
+type-parameters, to achieve other goals.</p>
+
+<p>I think this is an example of what I tend to dislike about generics and powerful
+type-systems in general. They tempt you to write a lot of extra machinery and
+types in a way that isn&#39;t necessarily semantically meaningful, but only used to
+encode some invariant in a way the compiler understands.</p>
+
+<hr>
+
+<p><a id="footnote1"></a>[1] One <em>upside</em> however, is that this could actually address
+the <em>other</em> criticism of <code>context.Value</code>: Its performance. If we consequently embed the
+parent-context as values in struct fields, the final context will be a flat
+struct. The interface-table of all the extra methods we add will point at the
+concrete implementations. There&#39;s no longer any need for a linear search to
+find a context value.</p>
+
+<p>I don&#39;t actually think there is much of a performance problem with
+<code>context.Value</code> in practice, but if there is, this could solve that.
+<a href="#footnote1_back">⬆</a></p>
+
+</article>
+
+    </main>
+
+    <footer class="page-footer green darken-4 white-text text-lighten-2">
+      <div class="row">
+        <div class="col offset-l2 l4">
+          <h5>Axel Wagner</h5>
+          <p class="grey-text text-lighten-4">
+		    SRE, Go programmer, Mathematician.
+          </p>
+		  <p class="grey-text text-lighten-4">
+		  	All opinions expressed are my own.
+	      </p>
+        </div>
+        <div class="col l4">
+          <ul>
+            <li><a class="grey-text text-lighten-4" href="https://github.com/Merovius">github.com/Merovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://twitter.com/TheMerovius">@TheMerovius</a></li>
+            <li><a class="grey-text text-lighten-4" href="https://plus.google.com/104026434400286502583">+Axel Wagner</a></li>
+            <li><a class="grey-text text-lighten-4" href="/impressum.html">Impressum</a></li>
+          </ul>
+      </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.99.0/js/materialize.min.js"></script>
+  </body>
+</html>
